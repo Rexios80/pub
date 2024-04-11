@@ -12,7 +12,7 @@ more information, see the
 
 The first step towards contributing is to contact the pub dev team and let us
 know what you're working on, so we can be sure not to start working on the same
-thing at the same time. Open an [issue](http://github.com/dart-lang/pub/issues/new)
+thing at the same time. Open an [issue](https://github.com/dart-lang/pub/issues/new)
 letting us know that you're interested in contributing and what you plan on working on.
 This will also let us give you specific advice about where to start.
 

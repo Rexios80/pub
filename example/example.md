@@ -1,0 +1,1 @@
+See [puby](https://github.com/Rexios80/puby/blob/db3ee7b312431dc89cbafa671f453fb6296fffa8/bin/link.dart) for a dependency resolution example

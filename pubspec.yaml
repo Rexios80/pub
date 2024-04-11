@@ -1,6 +1,6 @@
 name: pub_hosted
-description: A hosted version of the pub tool for use in other packages
-version: 1.0.0
+description: A hosted version of the pub tool code for use in other packages
+version: 1.0.1
 homepage: https://github.com/Rexios80/pub
 
 environment:
