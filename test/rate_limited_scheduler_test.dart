@@ -4,7 +4,7 @@
 
 import 'dart:async';
 
-import 'package:pub/src/rate_limited_scheduler.dart';
+import 'package:pub_hosted/src/rate_limited_scheduler.dart';
 import 'package:test/test.dart';
 
 void main() {

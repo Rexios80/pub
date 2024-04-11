@@ -5,9 +5,9 @@
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
-import 'package:pub/src/entrypoint.dart';
-import 'package:pub/src/exceptions.dart';
-import 'package:pub/src/system_cache.dart';
+import 'package:pub_hosted/src/entrypoint.dart';
+import 'package:pub_hosted/src/exceptions.dart';
+import 'package:pub_hosted/src/system_cache.dart';
 import 'package:test/test.dart';
 
 import 'descriptor.dart' as d;

@@ -191,7 +191,7 @@ final class Ignore {
   /// ```dart
   /// import 'dart:io';
   /// import 'package:path/path.dart' as p;
-  /// import 'package:pub/src/ignore.dart';
+  /// import 'package:pub_hosted/src/ignore.dart';
   ///
   /// void main(List<String> args) {
   ///   var root = p.normalize(args[0]);

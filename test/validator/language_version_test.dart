@@ -4,7 +4,7 @@
 
 import 'dart:io';
 
-import 'package:pub/src/language_version.dart';
+import 'package:pub_hosted/src/language_version.dart';
 import 'package:pub_semver/pub_semver.dart';
 import 'package:test/test.dart';
 

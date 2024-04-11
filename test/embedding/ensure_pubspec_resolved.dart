@@ -11,7 +11,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
-import 'package:pub/src/io.dart';
+import 'package:pub_hosted/src/io.dart';
 import 'package:test/test.dart';
 
 import '../descriptor.dart' as d;

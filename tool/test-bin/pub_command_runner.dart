@@ -9,11 +9,11 @@ import 'dart:io';
 
 import 'package:args/args.dart';
 import 'package:args/command_runner.dart';
-import 'package:pub/pub.dart';
-import 'package:pub/src/command.dart';
-import 'package:pub/src/exit_codes.dart' as exit_codes;
-import 'package:pub/src/log.dart' as log;
-import 'package:pub/src/utils.dart';
+import 'package:pub_hosted/pub.dart';
+import 'package:pub_hosted/src/command.dart';
+import 'package:pub_hosted/src/exit_codes.dart' as exit_codes;
+import 'package:pub_hosted/src/log.dart' as log;
+import 'package:pub_hosted/src/utils.dart';
 
 /// A command for explicitly throwing an exception, to test the handling of
 /// unexpected exceptions.

@@ -6,8 +6,8 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
-import 'package:pub/src/ascii_tree.dart' as ascii_tree;
-import 'package:pub/src/io.dart';
+import 'package:pub_hosted/src/ascii_tree.dart' as ascii_tree;
+import 'package:pub_hosted/src/io.dart';
 import 'package:stack_trace/stack_trace.dart' show Trace;
 import 'package:test/test.dart';
 

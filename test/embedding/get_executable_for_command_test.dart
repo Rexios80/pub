@@ -6,8 +6,8 @@ import 'dart:io';
 
 import 'package:path/path.dart' show separator;
 import 'package:path/path.dart' as p;
-import 'package:pub/pub.dart';
-import 'package:pub/src/log.dart' as log;
+import 'package:pub_hosted/pub.dart';
+import 'package:pub_hosted/src/log.dart' as log;
 
 import 'package:test/test.dart';
 

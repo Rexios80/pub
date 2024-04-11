@@ -3,7 +3,7 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'package:args/command_runner.dart';
-import 'package:pub/src/command_runner.dart' show PubCommandRunner;
+import 'package:pub_hosted/src/command_runner.dart' show PubCommandRunner;
 
 import 'golden_file.dart';
 

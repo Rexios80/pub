@@ -1,4 +1,4 @@
-name: pub
+name: pub_hosted
 description: A hosted version of the pub tool for use in other packages
 version: 1.0.0
 homepage: https://github.com/Rexios80/pub
