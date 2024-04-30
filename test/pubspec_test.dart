@@ -4,12 +4,12 @@
 
 import 'dart:io';
 
-import 'package:pub_hosted/src/exceptions.dart';
-import 'package:pub_hosted/src/pubspec.dart';
-import 'package:pub_hosted/src/source.dart';
-import 'package:pub_hosted/src/source/hosted.dart';
-import 'package:pub_hosted/src/source/root.dart';
-import 'package:pub_hosted/src/system_cache.dart';
+import 'package:dart_pub/src/exceptions.dart';
+import 'package:dart_pub/src/pubspec.dart';
+import 'package:dart_pub/src/source.dart';
+import 'package:dart_pub/src/source/hosted.dart';
+import 'package:dart_pub/src/source/root.dart';
+import 'package:dart_pub/src/system_cache.dart';
 import 'package:pub_semver/pub_semver.dart';
 import 'package:test/test.dart' hide Description;
 

@@ -2,8 +2,8 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-import 'package:pub_hosted/src/command_runner.dart';
-import 'package:pub_hosted/src/io.dart';
+import 'package:dart_pub/src/command_runner.dart';
+import 'package:dart_pub/src/io.dart';
 
 Future<void> main(List<String> arguments) async {
   await flushThenExit(await PubCommandRunner().run(arguments));

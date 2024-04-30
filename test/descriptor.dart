@@ -8,10 +8,10 @@ library;
 import 'dart:convert';
 
 import 'package:path/path.dart' as p;
-import 'package:pub_hosted/src/language_version.dart';
-import 'package:pub_hosted/src/oauth2.dart';
-import 'package:pub_hosted/src/package_config.dart';
-import 'package:pub_hosted/src/sdk/sdk_package_config.dart';
+import 'package:dart_pub/src/language_version.dart';
+import 'package:dart_pub/src/oauth2.dart';
+import 'package:dart_pub/src/package_config.dart';
+import 'package:dart_pub/src/sdk/sdk_package_config.dart';
 import 'package:test_descriptor/test_descriptor.dart';
 
 import 'descriptor/git.dart';

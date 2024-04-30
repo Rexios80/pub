@@ -2,8 +2,8 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-import 'package:pub_hosted/src/validator.dart';
-import 'package:pub_hosted/src/validator/sdk_constraint.dart';
+import 'package:dart_pub/src/validator.dart';
+import 'package:dart_pub/src/validator/sdk_constraint.dart';
 import 'package:test/test.dart';
 
 import '../descriptor.dart' as d;

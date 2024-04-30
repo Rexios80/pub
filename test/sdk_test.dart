@@ -3,9 +3,9 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'package:path/path.dart' as p;
-import 'package:pub_hosted/src/exit_codes.dart' as exit_codes;
-import 'package:pub_hosted/src/io.dart';
-import 'package:pub_hosted/src/sdk/sdk_package_config.dart';
+import 'package:dart_pub/src/exit_codes.dart' as exit_codes;
+import 'package:dart_pub/src/io.dart';
+import 'package:dart_pub/src/sdk/sdk_package_config.dart';
 import 'package:test/test.dart';
 
 import 'descriptor.dart' as d;

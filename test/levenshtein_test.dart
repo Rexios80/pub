@@ -2,7 +2,7 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-import 'package:pub_hosted/src/levenshtein.dart';
+import 'package:dart_pub/src/levenshtein.dart';
 import 'package:test/test.dart';
 
 void main() {

@@ -2,10 +2,10 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-import 'package:pub_hosted/src/ascii_tree.dart' as tree;
-import 'package:pub_hosted/src/package.dart';
-import 'package:pub_hosted/src/pubspec.dart';
-import 'package:pub_hosted/src/utils.dart';
+import 'package:dart_pub/src/ascii_tree.dart' as tree;
+import 'package:dart_pub/src/package.dart';
+import 'package:dart_pub/src/pubspec.dart';
+import 'package:dart_pub/src/utils.dart';
 import 'package:test/test.dart';
 
 import 'descriptor.dart';

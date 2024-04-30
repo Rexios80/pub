@@ -1,9 +1,9 @@
 import 'dart:io';
 
 import 'package:checks/checks.dart';
-import 'package:pub_hosted/src/dart.dart';
-import 'package:pub_hosted/src/exceptions.dart';
-import 'package:pub_hosted/src/log.dart';
+import 'package:dart_pub/src/dart.dart';
+import 'package:dart_pub/src/exceptions.dart';
+import 'package:dart_pub/src/log.dart';
 import 'package:test/test.dart';
 
 import 'descriptor.dart';

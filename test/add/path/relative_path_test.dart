@@ -4,7 +4,7 @@
 
 import 'dart:io' show Platform;
 
-import 'package:pub_hosted/src/exit_codes.dart' as exit_codes;
+import 'package:dart_pub/src/exit_codes.dart' as exit_codes;
 import 'package:test/test.dart';
 
 import '../../descriptor.dart' as d;

@@ -4,7 +4,7 @@
 
 import 'dart:async';
 
-import 'package:pub_hosted/src/validator/size.dart';
+import 'package:dart_pub/src/validator/size.dart';
 import 'package:test/test.dart';
 
 import '../descriptor.dart' as d;

@@ -9,9 +9,9 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
-import 'package:pub_hosted/src/crc32c.dart';
-import 'package:pub_hosted/src/source/hosted.dart';
-import 'package:pub_hosted/src/utils.dart' show hexEncode;
+import 'package:dart_pub/src/crc32c.dart';
+import 'package:dart_pub/src/source/hosted.dart';
+import 'package:dart_pub/src/utils.dart' show hexEncode;
 import 'package:pub_semver/pub_semver.dart';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
