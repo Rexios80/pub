@@ -7,7 +7,6 @@ import 'dart:async';
 import '../command.dart';
 import '../log.dart' as log;
 import '../solver.dart';
-import '../utils.dart';
 
 /// Handles the `get` pub command.
 class GetCommand extends PubCommand {
@@ -81,8 +80,8 @@ class GetCommand extends PubCommand {
       enforceLockfile: argResults.flag('enforce-lockfile'),
     );
 
-    var example = entrypoint.example;
-    if ((argResults['example'] as bool? ?? false) && example != null) {
+    final example = entrypoint.example;
+    if ((argResults.flag('example')) && example != null) {
       await example.acquireDependencies(
         SolveType.get,
         dryRun: argResults.flag('dry-run'),

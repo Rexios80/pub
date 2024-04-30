@@ -300,8 +300,8 @@ Specify multiple sdk packages with descriptors.''');
   ) async {
     final name = package.ref.name;
     final dependencies = [...original.dependencies.values];
-    var devDependencies = [...original.devDependencies.values];
-    var dependencyOverrides = [...original.dependencyOverrides.values];
+    final devDependencies = [...original.devDependencies.values];
+    final dependencyOverrides = [...original.dependencyOverrides.values];
 
     final dependencyNames = dependencies.map((dependency) => dependency.name);
     final devDependencyNames =
@@ -371,7 +371,7 @@ Specify multiple sdk packages with descriptors.''');
   /// Split [arg] on ':' and interpret it with the flags in [argResult] either as
   /// an old-style or a new-style descriptor to produce a PackageRef].
   _ParseResult _parsePackage(String arg, ArgResults argResults) {
-    var isDev = argResults['dev'] as bool;
+    var isDev = argResults.flag('dev');
     var isOverride = false;
 
     final match = _argRegExp.firstMatch(arg);

@@ -17,7 +17,7 @@ void main() {
     await servePackages();
     await d.validPackage().create();
     await d.credentialsFile(globalServer, 'access-token').create();
-    var pub = await startPublish(globalServer, args: ['--force']);
+    final pub = await startPublish(globalServer, args: ['--force']);
 
     handleUploadForm(globalServer);
     handleUpload(globalServer);
@@ -31,6 +31,9 @@ void main() {
     });
 
     await pub.shouldExit(exit_codes.SUCCESS);
-    expect(pub.stdout, emitsThrough('Package test_pkg 1.0.0 uploaded!'));
+    expect(
+      pub.stdout,
+      emitsThrough('Message from server: Package test_pkg 1.0.0 uploaded!'),
+    );
   });
 }

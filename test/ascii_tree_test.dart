@@ -2,9 +2,10 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-import 'package:pub_hosted/src/ascii_tree.dart' as tree;
-import 'package:pub_hosted/src/package.dart';
-import 'package:pub_hosted/src/utils.dart';
+import 'package:pub/src/ascii_tree.dart' as tree;
+import 'package:pub/src/package.dart';
+import 'package:pub/src/pubspec.dart';
+import 'package:pub/src/utils.dart';
 import 'package:test/test.dart';
 
 import 'descriptor.dart';
@@ -61,9 +62,11 @@ void main() {
         file('path.dart', bytes(100)),
       ]),
     ]).create();
-    var files =
-        Package.load(path(appPath), (name) => throw UnimplementedError())
-            .listFiles();
+    final files = Package.load(
+      path(appPath),
+      loadPubspec:
+          Pubspec.loadRootWithSources((name) => throw UnimplementedError()),
+    ).listFiles();
     ctx.expectNextSection(
       tree.fromFiles(files, baseDir: path(appPath), showFileSizes: true),
     );
@@ -73,7 +76,7 @@ void main() {
   });
 
   testWithGolden('tree.fromMap a complex example', colors: true, (ctx) {
-    var map = {
+    final map = {
       '.gitignore': <String, Map>{},
       'README.md': <String, Map>{},
       'TODO': <String, Map>{},

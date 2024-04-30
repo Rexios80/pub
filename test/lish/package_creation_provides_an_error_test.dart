@@ -16,7 +16,7 @@ void main() {
     await servePackages();
     await d.validPackage().create();
     await d.credentialsFile(globalServer, 'access-token').create();
-    var pub = await startPublish(globalServer);
+    final pub = await startPublish(globalServer);
 
     await confirmPublish(pub);
     handleUploadForm(globalServer);
@@ -30,7 +30,10 @@ void main() {
       );
     });
 
-    expect(pub.stderr, emits('Your package was too boring.'));
+    expect(
+      pub.stderr,
+      emits('Message from server: Your package was too boring.'),
+    );
     await pub.shouldExit(1);
   });
 }

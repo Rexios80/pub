@@ -87,56 +87,57 @@ class GlobalActivateCommand extends PubCommand {
         usageException('Cannot pass both --no-executables and --executable.');
       }
 
-      executables = argResults['executable'] as List<String>?;
+      executables = argResults.multiOption('executable');
     } else if (argResults.flag('no-executables')) {
       // An empty list means no executables.
       executables = [];
     }
 
-    final overwrite = argResults['overwrite'] as bool;
+    final overwrite = argResults.flag('overwrite');
 
     Iterable<String> args = argResults.rest;
 
     String readArg([String error = '']) {
       if (args.isEmpty) usageException(error);
-      var arg = args.first;
+      final arg = args.first;
       args = args.skip(1);
       return arg;
     }
 
     void validateNoExtraArgs() {
       if (args.isEmpty) return;
-      var unexpected = args.map((arg) => '"$arg"');
-      var arguments = pluralize('argument', unexpected.length);
+      final unexpected = args.map((arg) => '"$arg"');
+      final arguments = pluralize('argument', unexpected.length);
       usageException('Unexpected $arguments ${toSentence(unexpected)}.');
     }
 
-    if (argResults['source'] != 'git' &&
-        (argResults['git-path'] != null || argResults['git-ref'] != null)) {
+    if (argResults.optionWithDefault('source') != 'git' &&
+        (argResults.option('git-path') != null ||
+            argResults.option('git-ref') != null)) {
       usageException(
         'Options `--git-path` and `--git-ref` can only be used with --source=git.',
       );
     }
 
-    switch (argResults['source']) {
+    switch (argResults.optionWithDefault('source')) {
       case 'git':
-        var repo = readArg('No Git repository given.');
+        final repo = readArg('No Git repository given.');
         validateNoExtraArgs();
         return globals.activateGit(
           repo,
           executables,
           overwriteBinStubs: overwrite,
-          path: argResults['git-path'] as String?,
-          ref: argResults['git-ref'] as String?,
+          path: argResults.option('git-path'),
+          ref: argResults.option('git-ref'),
         );
 
       case 'hosted':
-        var package = readArg('No package to activate given.');
+        final package = readArg('No package to activate given.');
 
         PackageRef ref;
         try {
           ref = cache.hosted
-              .refFor(package, url: argResults['hosted-url'] as String?);
+              .refFor(package, url: argResults.option('hosted-url'));
         } on FormatException catch (e) {
           usageException('Invalid hosted-url: $e');
         }
@@ -167,7 +168,7 @@ class GlobalActivateCommand extends PubCommand {
         );
 
       case 'path':
-        var path = readArg('No package to activate given.');
+        final path = readArg('No package to activate given.');
         validateNoExtraArgs();
         return globals.activatePath(
           path,

@@ -10,7 +10,6 @@ import '../io.dart';
 import '../log.dart' as log;
 import '../pubspec.dart';
 import '../solver.dart';
-import '../utils.dart';
 
 /// Handles the `remove` pub command. Removes dependencies from `pubspec.yaml`,
 /// and performs an operation similar to `pub get`. Unlike `pub add`, this
@@ -97,7 +96,7 @@ To remove a dependency override of a package prefix the package name with
           dryRun: isDryRun,
         );
 
-    var example = entrypoint.example;
+    final example = entrypoint.example;
     if (!isDryRun && argResults.flag('example') && example != null) {
       await example.acquireDependencies(
         SolveType.get,
