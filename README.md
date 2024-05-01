@@ -16,11 +16,11 @@ dependencies:
 This package is a verbatim release of the `pub` tool code, therefore it does not export any libraries. All code must be accessed through specific imports for which the dev tools will not provide completions.
 
 ```dart
-import 'package:pub_hosted/src/solver.dart';
-import 'package:pub_hosted/src/system_cache.dart';
-import 'package:pub_hosted/src/entrypoint.dart';
-import 'package:pub_hosted/src/package_name.dart';
-import 'package:pub_hosted/src/source/cached.dart';
+import 'package:dart_pub/src/solver.dart';
+import 'package:dart_pub/src/system_cache.dart';
+import 'package:dart_pub/src/entrypoint.dart';
+import 'package:dart_pub/src/package_name.dart';
+import 'package:dart_pub/src/source/cached.dart';
 ```
 
 # Contributing to pub
