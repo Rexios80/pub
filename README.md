@@ -2,6 +2,27 @@
 
 Pub is the package manager for Dart.
 
+# Using as a package
+
+This is an UNOFFICIAL release of the `pub` tool code for use in other packages. The [puby](https://pub.dev/packages/puby) tool uses the dependency resolution code from this package.
+
+This package makes no promises in regards to breaking changes. Please pin to a specific version to avoid issues.
+
+```yaml
+dependencies:
+  dart_pub: 0.0.1
+```
+
+This package is a verbatim release of the `pub` tool code, therefore it does not export any libraries. All code must be accessed through specific imports for which the dev tools will not provide completions.
+
+```dart
+import 'package:pub_hosted/src/solver.dart';
+import 'package:pub_hosted/src/system_cache.dart';
+import 'package:pub_hosted/src/entrypoint.dart';
+import 'package:pub_hosted/src/package_name.dart';
+import 'package:pub_hosted/src/source/cached.dart';
+```
+
 # Contributing to pub
 
 Thanks for being interested in contributing to pub! Contributing to a new
@@ -21,12 +42,12 @@ This will also let us give you specific advice about where to start.
 Pub isn't a package, but it's organized like one. It has four top-level
 directories:
 
-* `lib/` contains the implementation of pub. Currently, it's all in `lib/src/`,
+- `lib/` contains the implementation of pub. Currently, it's all in `lib/src/`,
   since there are no libraries intended for public consumption.
 
-* `test/` contains the tests for pub.
+- `test/` contains the tests for pub.
 
-* `bin/` contains `pub.dart`, the entrypoint script that's run whenever a user
+- `bin/` contains `pub.dart`, the entrypoint script that's run whenever a user
   types "pub" on the command line or runs it in the Dart editor. This is usually
   run through shell scripts in `sdk/bin` at the root of the Dart repository.
 
