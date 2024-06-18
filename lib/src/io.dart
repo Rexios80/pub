@@ -14,6 +14,7 @@ import 'dart:typed_data';
 import 'package:async/async.dart';
 import 'package:cli_util/cli_util.dart'
     show EnvironmentNotFoundException, applicationConfigHome;
+import 'package:collection/collection.dart';
 import 'package:http/http.dart' show ByteStream;
 import 'package:http_multi_server/http_multi_server.dart';
 import 'package:meta/meta.dart';
@@ -97,6 +98,10 @@ FileStat? tryStatFile(String path) {
     return stat;
   }
   return null;
+}
+
+FileStat statPath(String path) {
+  return File(path).statSync();
 }
 
 /// Returns the canonical path for [pathString].
@@ -197,8 +202,19 @@ String _resolveLink(String link) {
   return link;
 }
 
-/// Reads the contents of the text file [file].
-String readTextFile(String file) => File(file).readAsStringSync();
+/// Reads the contents of the text file at [path].
+String readTextFile(String path) => File(path).readAsStringSync();
+
+/// Reads the contents of the text file at [path].
+/// Returns `null` if the operation fails.
+String? tryReadTextFile(String path) {
+  try {
+    return readTextFile(path);
+  } on FileSystemException {
+    // TODO: Consider handlind file-not-found differently from other exceptions.
+    return null;
+  }
+}
 
 /// Reads the contents of the text file [file].
 Future<String> readTextFileAsync(String file) {
@@ -546,18 +562,26 @@ void renameFile(String from, String to) {
 bool _isDirectoryNotEmptyException(FileSystemException e) {
   final errorCode = e.osError?.errorCode;
   return
-      // On Linux rename will fail with ENOTEMPTY if directory exists:
-      // https://man7.org/linux/man-pages/man2/rename.2.html
-      // #define	ENOTEMPTY	39	/* Directory not empty */
+      // On Linux rename will fail with either ENOTEMPTY or EEXISTS if directory
+      // exists: https://man7.org/linux/man-pages/man2/rename.2.html
+      // ```
+      // #define  ENOTEMPTY 39  /* Directory not empty */
+      // #define  EEXIST    17  /* File exists */
+      // ```
+      // https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/include/uapi/asm-generic/errno-base.h#n21
       // https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/include/uapi/asm-generic/errno.h#n20
-      (Platform.isLinux && errorCode == 39) ||
+      (Platform.isLinux && (errorCode == 39 || errorCode == 17)) ||
           // On Windows this may fail with ERROR_DIR_NOT_EMPTY or ERROR_ALREADY_EXISTS
           // https://docs.microsoft.com/en-us/windows/win32/debug/system-error-codes--0-499-
           (Platform.isWindows && (errorCode == 145 || errorCode == 183)) ||
           // On MacOS rename will fail with ENOTEMPTY if directory exists.
+          // We also catch EEXIST - perhaps that could also be thrown...
+          // ```
           // #define ENOTEMPTY       66              /* Directory not empty */
+          // #define	EEXIST		17	/* File exists */
+          // ```
           // https://github.com/apple-oss-distributions/xnu/blob/bb611c8fecc755a0d8e56e2fa51513527c5b7a0e/bsd/sys/errno.h#L190
-          (Platform.isMacOS && errorCode == 66);
+          (Platform.isMacOS && (errorCode == 66 || errorCode == 17));
 }
 
 /// Creates a new symlink at path [symlink] that points to [target].
@@ -1048,12 +1072,14 @@ Future<void> extractTarGz(Stream<List<int>> stream, String destination) async {
       throw FormatException('Tar file contained duplicate path ${entry.name}');
     }
 
-    if (!p.isWithin(destination, filePath)) {
+    if (!(p.isWithin(destination, filePath) ||
+        // allow including '.' as an entry in the tar.gz archive.
+        (entry.type == TypeFlag.dir && p.equals(destination, filePath)))) {
       // The tar contains entries that would be written outside of the
       // destination. That doesn't happen by accident, assume that the tar file
       // is malicious.
       await reader.cancel();
-      throw FormatException('Invalid tar entry: ${entry.name}');
+      throw FormatException('Invalid tar entry: `${entry.name}`');
     }
 
     final parentDirectory = p.dirname(filePath);
@@ -1128,9 +1154,8 @@ Future<void> extractTarGz(Stream<List<int>> stream, String destination) async {
 
 /// Create a .tar.gz archive from a list of entries.
 ///
-/// Each entry can be a [String], [Directory], or [File] object. The root of
-/// the archive is considered to be [baseDir], which defaults to the current
-/// working directory.
+/// Each entry is the path to a directory or file. The root of the archive is
+/// considered to be [baseDir], which defaults to the current working directory.
 ///
 /// Returns a [ByteStream] that emits the contents of the archive.
 ByteStream createTarGz(
@@ -1148,6 +1173,9 @@ ByteStream createTarGz(
   final tarContents = Stream.fromIterable(
     contents.map((entry) {
       entry = p.normalize(p.absolute(entry));
+      if (p.equals(baseDir, entry)) {
+        return null;
+      }
       if (!p.isWithin(baseDir, entry)) {
         throw ArgumentError('Entry $entry is not inside $baseDir.');
       }
@@ -1157,26 +1185,40 @@ ByteStream createTarGz(
       final file = File(p.normalize(entry));
       final stat = file.statSync();
 
+      // Ensure paths in tar files use forward slashes
+      final name = p.url.joinAll(p.split(relative));
+
       if (stat.type == FileSystemEntityType.link) {
         log.message('$entry is a link locally, but will be uploaded as a '
             'duplicate file.');
       }
-
-      return TarEntry(
-        TarHeader(
-          // Ensure paths in tar files use forward slashes
-          name: p.url.joinAll(p.split(relative)),
-          // We want to keep executable bits, but otherwise use the default
-          // file mode
-          mode: _defaultMode | (stat.mode & _executableMask),
-          size: stat.size,
-          modified: stat.changed,
-          userName: 'pub',
-          groupName: 'pub',
-        ),
-        file.openRead(),
-      );
-    }),
+      if (stat.type == FileSystemEntityType.directory) {
+        return TarEntry(
+          TarHeader(
+            name: name,
+            mode: _defaultMode | _executableMask,
+            typeFlag: TypeFlag.dir,
+            userName: 'pub',
+            groupName: 'pub',
+          ),
+          Stream.fromIterable([]),
+        );
+      } else {
+        return TarEntry(
+          TarHeader(
+            name: name,
+            // We want to keep executable bits, but otherwise use the default
+            // file mode
+            mode: _defaultMode | (stat.mode & _executableMask),
+            size: stat.size,
+            modified: stat.changed,
+            userName: 'pub',
+            groupName: 'pub',
+          ),
+          file.openRead(),
+        );
+      }
+    }).nonNulls,
   );
 
   return ByteStream(

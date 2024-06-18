@@ -6,11 +6,13 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
-import 'package:dart_pub/src/exit_codes.dart';
+import 'package:pub/src/exit_codes.dart';
+import 'package:shelf/shelf.dart' as shelf;
 import 'package:test/test.dart';
 import 'package:yaml/yaml.dart';
 
 import 'descriptor.dart';
+import 'lish/utils.dart';
 import 'test_pub.dart';
 
 void main() {
@@ -344,11 +346,15 @@ void main() {
         ]),
       ]),
     ]).create();
+    final absoluteAppPath = p.join(sandbox, appPath);
     await pubGet(
       environment: {'_PUB_TEST_SDK_VERSION': '3.5.0'},
       workingDirectory: p.join(sandbox, appPath, 'pkgs'),
-      output: contains(
-        'Resolving dependencies in `${p.join(sandbox, appPath)}`...',
+      output: allOf(
+        contains(
+          'Resolving dependencies in `$absoluteAppPath`...',
+        ),
+        contains('Got dependencies in `$absoluteAppPath`'),
       ),
     );
     await pubGet(
@@ -1292,6 +1298,115 @@ Consider removing one of the overrides.''',
     await pubGet(
       environment: {'_PUB_TEST_SDK_VERSION': '3.5.0'},
       output: contains('! foo 1.0.1 from path ..${s}foo (overridden)'),
+    );
+  });
+
+  test('Can publish from workspace', () async {
+    final server = await servePackages();
+    await credentialsFile(server, 'access-token').create();
+    server.expect('GET', '/create', (request) {
+      return shelf.Response.ok(
+        jsonEncode({
+          'success': {'message': 'Package test_pkg 1.0.0 uploaded!'},
+        }),
+      );
+    });
+    await dir('workspace', [
+      libPubspec(
+        'workspace',
+        '1.2.3',
+        extras: {
+          'workspace': [appPath],
+        },
+        sdk: '^3.5.0',
+      ),
+      validPackage(
+        pubspecExtras: {
+          'environment': {'sdk': '^3.5.0'},
+          'resolution': 'workspace',
+        },
+      ),
+    ]).create();
+
+    await runPub(
+      args: ['publish', '--to-archive=archive.tar.gz'],
+      workingDirectory: p.join(sandbox, 'workspace', appPath),
+      environment: {'_PUB_TEST_SDK_VERSION': '3.5.0'},
+      output: contains('''
+├── CHANGELOG.md (<1 KB)
+├── LICENSE (<1 KB)
+├── README.md (<1 KB)
+├── lib
+│   └── test_pkg.dart (<1 KB)
+└── pubspec.yaml (<1 KB)
+'''),
+    );
+
+    final pub = await startPublish(
+      server,
+      workingDirectory: p.join(sandbox, 'workspace', appPath),
+      environment: {'_PUB_TEST_SDK_VERSION': '3.5.0'},
+    );
+
+    await confirmPublish(pub);
+    handleUploadForm(server);
+    handleUpload(server);
+    await pub.shouldExit(SUCCESS);
+  });
+
+  test(
+      'published packages with `resolution: workspace` and `workspace` sections can be consumed out of context.',
+      () async {
+    final server = await servePackages();
+    server.serve(
+      'foo',
+      '1.0.0',
+      pubspec: {
+        'environment': {'sdk': '^3.5.0'},
+        'resolution': 'workspace',
+        'workspace': ['example'],
+      },
+      contents: [
+        dir('bin', [file('foo.dart', 'main() => print("FOO");')]),
+      ],
+    );
+    await appDir(dependencies: {'foo': '^1.0.0'}).create();
+    await pubGet(environment: {'_PUB_TEST_SDK_VERSION': '3.5.0'});
+    await runPub(
+      args: ['run', 'foo'],
+      environment: {'_PUB_TEST_SDK_VERSION': '3.5.0'},
+      output: contains('FOO'),
+    );
+  });
+
+  test('Cannot override workspace packages', () async {
+    await servePackages();
+    await dir(appPath, [
+      libPubspec(
+        'myapp',
+        '1.2.3',
+        extras: {
+          'workspace': ['pkgs/a'],
+          'dependency_overrides': {
+            'a': {'path': 'pkgs/a'},
+          },
+        },
+        sdk: '^3.5.0',
+      ),
+      dir('pkgs', [
+        dir('a', [
+          libPubspec('a', '1.1.1', resolutionWorkspace: true),
+        ]),
+      ]),
+    ]).create();
+    await pubGet(
+      environment: {'_PUB_TEST_SDK_VERSION': '3.5.0'},
+      error: allOf(
+        contains('Cannot override workspace packages'),
+        contains(
+          'Package `a` at `.${s}pkgs/a` is overridden in `pubspec.yaml`.',
+        ),
+      ),
     );
   });
 }

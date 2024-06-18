@@ -80,7 +80,7 @@ void testEnsurePubspecResolved() {
             .deleteSync();
 
         await _implicitPubGet(
-          'No .dart_tool/package_config.json file found',
+          '`./pubspec.yaml` exists without corresponding `./pubspec.yaml` or `.dart_tool/pub/workspace_ref.json`.',
         );
       });
 
@@ -297,7 +297,9 @@ void testEnsurePubspecResolved() {
         await pubGet(
           environment: {'FLUTTER_ROOT': p.join(d.sandbox, 'flutter')},
         );
-
+        await _noImplicitPubGet(
+          environment: {'FLUTTER_ROOT': p.join(d.sandbox, 'flutter')},
+        );
         await d.dir('flutter', [d.flutterVersion('0.9.0')]).create();
 
         server.serve(

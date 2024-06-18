@@ -23,11 +23,44 @@ class ThrowingCommand extends PubCommand {
   @override
   String get description => 'Throws an exception';
 
-  bool get hide => true;
-
   @override
   Future<int> runProtected() async {
     throw StateError('Pub has crashed');
+  }
+}
+
+/// A command for testing the [getExecutableForCommand] functionality.
+class GetExecutableForCommandCommand extends PubCommand {
+  @override
+  String get name => 'get-executable-for-command';
+
+  @override
+  String get description =>
+      'Finds the package config and executable given a command';
+
+  @override
+  bool get hidden => true;
+
+  GetExecutableForCommandCommand() {
+    argParser.addFlag('allow-snapshot');
+  }
+
+  @override
+  Future<void> runProtected() async {
+    try {
+      final result = await getExecutableForCommand(
+        argResults.rest[0],
+        allowSnapshot: argResults.flag('allow-snapshot'),
+      );
+      log.message('Executable: ${result.executable}');
+      log.message(
+        'Package config: ${result.packageConfig ?? 'No package config'}',
+      );
+    } on CommandResolutionFailedException catch (e) {
+      log.message('Error: ${e.message}');
+      log.message('Issue: ${e.issue}');
+      overrideExitCode(-1);
+    }
   }
 }
 
@@ -83,7 +116,8 @@ class Runner extends CommandRunner<int> {
         isVerbose: () => _results.flag('verbose'),
       )
         ..addSubcommand(ThrowingCommand())
-        ..addSubcommand(EnsurePubspecResolvedCommand()),
+        ..addSubcommand(EnsurePubspecResolvedCommand())
+        ..addSubcommand(GetExecutableForCommandCommand()),
     );
     addCommand(RunCommand());
     argParser.addFlag('verbose');

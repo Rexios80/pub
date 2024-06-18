@@ -303,7 +303,26 @@ the \$PUB_HOSTED_URL environment variable.''',
       await entrypoint.acquireDependencies(SolveType.get);
     }
 
-    final files = entrypoint.workPackage.listFiles();
+    // For displaying the layout we only want to explicitly mention non-empty
+    // directories, so first we list all files and directories, and then filter
+    // any non-empty directories away.
+    // For validation it is practical to also maintain the list of files.
+    final filesAndDirs = entrypoint.workPackage.listFiles(includeDirs: true);
+
+    final files = <String>[];
+    final filesAndEmptyDirs = <String>[];
+    for (final entry in filesAndDirs) {
+      final stat = statPath(entry);
+      if (stat.type == FileSystemEntityType.directory) {
+        if (listDir(entry).isEmpty) {
+          filesAndEmptyDirs.add(entry);
+        }
+      } else {
+        files.add(entry);
+        filesAndEmptyDirs.add(entry);
+      }
+    }
+
     log.fine('Archiving and publishing ${entrypoint.workPackage.name}.');
 
     // Show the package contents so the user can verify they look OK.
@@ -311,11 +330,13 @@ the \$PUB_HOSTED_URL environment variable.''',
     final host = computeHost(package.pubspec);
     log.message(
       'Publishing ${package.name} ${package.version} to $host:\n'
-      '${tree.fromFiles(files, baseDir: entrypoint.workPackage.dir, showFileSizes: true)}',
+      '${tree.fromFiles(filesAndEmptyDirs, baseDir: entrypoint.workPackage.dir, showFileSizes: true)}',
     );
 
-    final packageBytes =
-        await createTarGz(files, baseDir: entrypoint.workPackage.dir).toBytes();
+    final packageBytes = await createTarGz(
+      filesAndDirs,
+      baseDir: entrypoint.workPackage.dir,
+    ).toBytes();
 
     log.message(
       '\nTotal compressed archive size: ${_readableFileSize(packageBytes.length)}.\n',

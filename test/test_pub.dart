@@ -1048,10 +1048,25 @@ Map<String, String> extendedPathEnv() {
   };
 }
 
+const _defaultMode = 420; // 644₈
+const _executableMask = 0x49; // 001 001 001
+
 Stream<List<int>> tarFromDescriptors(Iterable<d.Descriptor> contents) {
   final entries = <TarEntry>[];
   void addDescriptor(d.Descriptor descriptor, String path) {
     if (descriptor is d.DirectoryDescriptor) {
+      if (descriptor.contents.isEmpty) {
+        entries.add(
+          TarEntry(
+            TarHeader(
+              name: p.posix.join(path, descriptor.name),
+              typeFlag: TypeFlag.dir,
+              mode: _defaultMode | _executableMask,
+            ),
+            Stream.fromIterable([]),
+          ),
+        );
+      }
       for (final e in descriptor.contents) {
         addDescriptor(e, p.posix.join(path, descriptor.name));
       }
