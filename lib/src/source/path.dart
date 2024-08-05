@@ -67,7 +67,7 @@ class PathSource extends Source {
     LanguageVersion? languageVersion,
   }) {
     if (description is! String) {
-      throw FormatException('The description must be a path string.');
+      throw const FormatException('The description must be a path string.');
     }
     final dir = description;
     // Resolve the path relative to the containing file path, and remember
@@ -103,11 +103,13 @@ class PathSource extends Source {
           '"$description" is an absolute path, it can\'t be referenced from a git pubspec.',
         );
       }
-      final resolvedPath = p.url.joinAll([
-        containingDescription.path,
-        ...p.posix.split(dir),
-      ]);
-      if (!p.isWithin('.', resolvedPath)) {
+      final resolvedPath = p.url.normalize(
+        p.url.joinAll([
+          containingDescription.path,
+          ...p.posix.split(dir),
+        ]),
+      );
+      if (!(p.isWithin('.', resolvedPath) || p.equals('.', resolvedPath))) {
         throw FormatException(
           'the path "$description" cannot refer outside the git repository $resolvedPath.',
         );
@@ -118,12 +120,7 @@ class PathSource extends Source {
           url: containingDescription.url,
           relative: containingDescription.relative,
           ref: containingDescription.ref,
-          path: p.normalize(
-            p.join(
-              containingDescription.path,
-              dir,
-            ),
-          ),
+          path: resolvedPath,
         ),
       );
     } else if (containingDescription is HostedDescription) {
@@ -146,16 +143,16 @@ class PathSource extends Source {
     String? containingDir,
   }) {
     if (description is! Map) {
-      throw FormatException('The description must be a map.');
+      throw const FormatException('The description must be a map.');
     }
     var path = description['path'];
     if (path is! String) {
-      throw FormatException("The 'path' field of the description must "
+      throw const FormatException("The 'path' field of the description must "
           'be a string.');
     }
     final relative = description['relative'];
     if (relative is! bool) {
-      throw FormatException("The 'relative' field of the description "
+      throw const FormatException("The 'relative' field of the description "
           'must be a boolean.');
     }
 
