@@ -5,6 +5,7 @@
 import 'command.dart' show PubCommand, PubTopLevel;
 import 'command.dart';
 import 'command/add.dart';
+import 'command/bump.dart';
 import 'command/cache.dart';
 import 'command/deps.dart';
 import 'command/downgrade.dart';
@@ -20,6 +21,7 @@ import 'command/token.dart';
 import 'command/unpack.dart';
 import 'command/upgrade.dart';
 import 'command/uploader.dart';
+import 'command/workspace.dart';
 import 'log.dart' as log;
 import 'log.dart';
 import 'utils.dart';
@@ -69,6 +71,7 @@ class PubEmbeddableCommand extends PubCommand implements PubTopLevel {
     //
     // New commands should (most likely) be included in both lists.
     addSubcommand(AddCommand());
+    addSubcommand(BumpCommand());
     addSubcommand(CacheCommand());
     addSubcommand(DepsCommand());
     addSubcommand(DowngradeCommand());
@@ -84,6 +87,7 @@ class PubEmbeddableCommand extends PubCommand implements PubTopLevel {
     addSubcommand(LoginCommand());
     addSubcommand(LogoutCommand());
     addSubcommand(TokenCommand());
+    addSubcommand(WorkspaceCommand());
   }
 
   @override

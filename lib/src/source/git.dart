@@ -38,7 +38,7 @@ class GitSource extends CachedSource {
     String name,
     Object? description, {
     Description? containingDescription,
-    LanguageVersion? languageVersion,
+    required LanguageVersion languageVersion,
   }) {
     String url;
     String? ref;
@@ -72,6 +72,16 @@ class GitSource extends CachedSource {
             'string.');
       }
       path = descriptionPath;
+
+      if (languageVersion.forbidsUnknownDescriptionKeys) {
+        for (final key in description.keys) {
+          if (!['url', 'ref', 'path'].contains(key)) {
+            throw FormatException(
+              'Unknown key "$key" in description.',
+            );
+          }
+        }
+      }
     }
 
     final containingDir = switch (containingDescription) {
@@ -251,7 +261,8 @@ class GitSource extends CachedSource {
     });
   }
 
-  /// Lists the file as it is represented at the revision of [description].
+  /// Lists the file as it is represented at the revision of
+  /// [resolvedDescription].
   ///
   /// Assumes that revision is present in the cache already (can be done with
   /// [_ensureRevision]).
@@ -272,11 +283,8 @@ class GitSource extends CachedSource {
     final repoPath = _repoCachePath(description, cache);
     final revision = resolvedDescription.resolvedRef;
 
-    late List<String> lines;
     try {
-      // TODO(sigurdm): We should have a `git.run` alternative that gives back
-      // a stream of stdout instead of the lines.
-      lines = await git.run(
+      return await git.run(
         [_gitDirArg(repoPath), 'show', '$revision:$pathInCache'],
         workingDir: repoPath,
       );
@@ -284,7 +292,6 @@ class GitSource extends CachedSource {
       fail('Could not find a file named "$pathInCache" in '
           '${GitDescription.prettyUri(description.url)} $revision.');
     }
-    return lines.join('\n');
   }
 
   @override
@@ -358,9 +365,10 @@ class GitSource extends CachedSource {
   /// Clones a Git repo to the local filesystem.
   ///
   /// The Git cache directory is a little idiosyncratic. At the top level, it
-  /// contains a directory for each commit of each repository, named `<package
-  /// name>-<commit hash>`. These are the canonical package directories that are
-  /// linked to from the `.dart_tool/package_config.json` file.
+  /// contains a directory for each commit of each repository, named
+  /// `<package name>-<commit hash>`. These are the canonical package
+  /// directories that are linked to from the `.dart_tool/package_config.json`
+  /// file.
   ///
   /// In addition, the Git system cache contains a subdirectory named `cache/`
   /// which contains a directory for each separate repository URL, named
@@ -496,7 +504,8 @@ class GitSource extends CachedSource {
           RepairResult(package.name, package.version, this, success: false),
         );
 
-        // Delete the revision cache path, not the subdirectory that contains the package.
+        // Delete the revision cache path, not the subdirectory that contains
+        // the package.
         final repoRoot = git.repoRoot(package.dir);
         if (repoRoot != null) tryDeleteEntry(repoRoot);
       }
@@ -602,7 +611,7 @@ class GitSource extends CachedSource {
         [_gitDirArg(dirPath), 'rev-parse', '--is-inside-git-dir'],
         workingDir: dirPath,
       );
-      if (result.join('\n') != 'true') {
+      if (result.trim() != 'true') {
         isValid = false;
       }
     } on git.GitException {
@@ -652,21 +661,22 @@ class GitSource extends CachedSource {
   ///
   /// This assumes that the canonical clone already exists.
   Future<String> _firstRevision(String path, String reference) async {
-    final List<String> lines;
+    final String output;
     try {
-      lines = await git.run(
+      output = (await git.run(
         [_gitDirArg(path), 'rev-list', '--max-count=1', reference],
         workingDir: path,
-      );
+      ))
+          .trim();
     } on git.GitException catch (e) {
       throw PackageNotFoundException(
         "Could not find git ref '$reference' (${e.stderr})",
       );
     }
-    if (lines.isEmpty) {
+    if (output.isEmpty) {
       throw PackageNotFoundException("Could not find git ref '$reference'.");
     }
-    return lines.first;
+    return output;
   }
 
   /// Clones the repo at the URI [from] to the path [to] on the local
@@ -676,9 +686,6 @@ class GitSource extends CachedSource {
   /// out the working tree, but instead makes the repository a local mirror of
   /// the remote repository. See the manpage for `git clone` for more
   /// information.
-  ///
-  /// If [shallow] is true, creates a shallow clone that contains no history
-  /// for the repository.
   Future<void> _clone(
     String from,
     String to, {
@@ -692,8 +699,8 @@ class GitSource extends CachedSource {
     await git.run(args);
   }
 
-  /// Like [_clone], but clones to a temporary directory (inside the [cache]) and
-  /// moves
+  /// Like [_clone], but clones to a temporary directory (inside the [cache])
+  /// and moves
   Future<void> _cloneViaTemp(
     String from,
     String to,
@@ -724,7 +731,8 @@ class GitSource extends CachedSource {
 
   String _revisionCachePath(PackageId id, SystemCache cache) => p.join(
         cache.rootDirForSource(this),
-        '${_repoName(id.description.description as GitDescription)}-${(id.description as ResolvedGitDescription).resolvedRef}',
+        '${_repoName(id.description.description as GitDescription)}-'
+        '${(id.description as ResolvedGitDescription).resolvedRef}',
       );
 
   /// Returns the path to the canonical clone of the repository referred to by
@@ -759,8 +767,8 @@ class GitDescription extends Description {
   /// to the pubspec location, and stored here as an absolute file url, and
   /// [relative] will be true.
   ///
-  /// This will not always parse as a [Uri] due the fact that `Uri.parse` does not allow strings of
-  /// the form: 'git@github.com:dart-lang/pub.git'.
+  /// This will not always parse as a [Uri] due the fact that `Uri.parse` does
+  /// not allow strings of the form: 'git@github.com:dart-lang/pub.git'.
   final String url;
 
   /// `true` if [url] was parsed from a relative url.

@@ -33,12 +33,12 @@ d.DirectoryDescriptor package({
 }
 
 Future<void> expectValidation({
-  Object? error,
+  Object? message,
   int exitCode = 0,
   Map<String, String> environment = const {},
 }) async {
   await runPub(
-    error: error ?? contains('Package has 0 warnings.'),
+    output: message ?? contains('Package has 0 warnings.'),
     args: ['publish', '--dry-run'],
     // workingDirectory: d.path(appPath),
     exitCode: exitCode,
@@ -47,25 +47,25 @@ Future<void> expectValidation({
 }
 
 Future<void> expectValidationWarning(
-  Object? error, {
+  Object? message, {
   int count = 1,
   Map<String, String> environment = const {},
 }) async {
-  if (error is String) error = contains(error);
+  if (message is String) message = contains(message);
   await expectValidation(
-    error: allOf([error, contains('Package has $count warning')]),
+    message: allOf([message, contains('Package has $count warning')]),
     exitCode: DATA,
     environment: environment,
   );
 }
 
 Future<void> expectValidationError(
-  String text, {
+  String message, {
   Map<String, String> environment = const {},
 }) async {
   await expectValidation(
-    error: allOf([
-      contains(text),
+    message: allOf([
+      contains(message),
       contains('Package validation found the following error:'),
     ]),
     exitCode: DATA,
@@ -138,7 +138,8 @@ void main() {
     });
 
     test(
-      'depends on a package from Flutter with an appropriate Dart SDK constraint',
+      'depends on a package from Flutter '
+      'with an appropriate Dart SDK constraint',
       () async {
         await d.dir('flutter', [d.flutterVersion('1.2.3')]).create();
         await flutterPackage('foo').create();
@@ -157,7 +158,8 @@ void main() {
     );
 
     test(
-      'depends on a package from Fuchsia with an appropriate Dart SDK constraint',
+      'depends on a package from Fuchsia '
+      'with an appropriate Dart SDK constraint',
       () async {
         await fuchsiaPackage('foo', sdk: '^3.0.0').create();
         await package(
@@ -194,8 +196,8 @@ void main() {
         });
 
         test(
-            "and should suggest the hosted prerelease version if it's the only version available",
-            () async {
+            'and should suggest the hosted prerelease version '
+            "if it's the only version available", () async {
           await d.dir('foo', [
             d.libPubspec('foo', '1.2.3'),
           ]).create();
@@ -266,8 +268,8 @@ void main() {
         });
 
         test(
-            'and it should suggest a concrete constraint if the locked version is pre-1.0.0',
-            () async {
+            'and it should suggest a concrete constraint '
+            'if the locked version is pre-1.0.0', () async {
           (await servePackages()).serve('foo', '0.1.2');
 
           await d.dir(appPath, [

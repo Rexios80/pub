@@ -98,7 +98,8 @@ class PartialSolution {
       if (removed.isDecision) _decisions.remove(removed.package.name);
     }
 
-    // Re-compute [_positive] and [_negative] for the packages that were removed.
+    // Re-compute [_positive] and [_negative] for the packages that were
+    // removed.
     for (var package in packages) {
       _positive.remove(package);
       _negative.remove(package);
@@ -164,9 +165,9 @@ class PartialSolution {
     throw StateError('[BUG] $term is not satisfied.');
   }
 
-  /// Returns whether `this` satisfies [other].
+  /// Returns whether `this` satisfies [term].
   ///
-  /// That is, whether [other] must be true given the assignments in this
+  /// That is, whether [term] must be true given the assignments in this
   /// partial solution.
   bool satisfies(Term term) => relation(term) == SetRelation.subset;
 

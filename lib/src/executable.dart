@@ -30,17 +30,17 @@ List<String> vmArgsFromArgResults(ArgResults argResults) {
   ];
 }
 
-/// Runs [executable] from [package] reachable from [entrypoint].
+/// Runs [executable] reachable from [entrypoint].
 ///
-/// The [executable] is a relative path to a Dart file within [package], which
-/// should either be the entrypoint package or an immediate dependency of it.
+/// The [executable] references Dart file, which should either be the entrypoint
+/// package or an immediate dependency of it.
 ///
 /// Arguments from [args] will be passed to the spawned Dart application.
 ///
 /// If [enableAsserts] is true, the program is run with assertions enabled.
 ///
 /// If the executable is in an immutable package and we pass no [vmArgs], it
-/// run from snapshot (and built if the snapshot doesn't already exist).
+/// runs from snapshot (and built if the snapshot doesn't already exist).
 ///
 /// Returns the exit code of the spawned app.
 Future<int> runExecutable(
@@ -92,13 +92,6 @@ Future<int> runExecutable(
   }
 
   if (useSnapshot) {
-    // Since we don't access the package graph, this doesn't happen
-    // automatically.
-    await Entrypoint.ensureUpToDate(
-      entrypoint.workspaceRoot.dir,
-      cache: entrypoint.cache,
-    );
-
     if (!fileExists(snapshotPath) ||
         (await entrypoint.packageGraph).isPackageMutable(package)) {
       await recompile(executable);
@@ -219,7 +212,7 @@ final class DartExecutableWithPackageConfig {
   /// Can be a .dart file or an incremental snapshot.
   final String executable;
 
-  /// The package_config.json to run [executable] with. Or <null> if the VM
+  /// The package_config.json to run [executable] with. Or `<null>` if the VM
   /// should find it according to the standard rules.
   final String? packageConfig;
 
@@ -250,17 +243,17 @@ final class DartExecutableWithPackageConfig {
 ///   obtain a package config. If that fails, return a
 ///   [CommandResolutionFailedException].
 ///
-/// * Otherwise let  `<current>` be the name of the innermost package containing
+/// * Otherwise let `<current>` be the name of the innermost package containing
 ///   [root], and interpret [descriptor] as `[<package>][:<command>]`.
 ///
-///   * If `<package>` is empty: default to the package at [current].
+///   * If `<package>` is empty: default to the current package.
 ///   * If `<command>` is empty, resolve it as `bin/<package>.dart` or
 ///     `bin/main.dart` to the first that exists.
 ///
 /// For example:
 /// * `foo` will resolve to `foo:bin/foo.dart` or `foo:bin/main.dart`.
 /// * `:foo` will resolve to `<current>:bin/foo.dart`.
-/// * `` and `:` both resolves to `<current>:bin/<current>.dart` or
+/// * The empty string and `":"` both resolves to `<current>:bin/<current>.dart` or
 ///   `bin/<current>:main.dart`.
 ///
 /// If that doesn't resolve as an existing file, throw an exception.
@@ -351,8 +344,10 @@ Future<DartExecutableWithPackageConfig> getExecutableForCommand(
   )?.$1;
 
   if (rootPackageName == null) {
+    final packageConfigPath =
+        p.join(workspaceRootDir, '.dart_tool', 'package_config.json');
     throw CommandResolutionFailedException._(
-      '${p.join(workspaceRootDir, '.dart_tool', 'package_config.json')} did not contain its own root package',
+      '$packageConfigPath did not contain its own root package',
       CommandResolutionIssue.fileNotFound,
     );
   }
@@ -453,11 +448,11 @@ enum CommandResolutionIssue {
   /// such file exists.
   fileNotFound,
 
-  /// The command-string was '<package>:<binary>' or '<package>', and <package>
-  /// was not in dependencies.
+  /// The command-string was `<package>:<binary>` or `<package>`, and
+  /// `<package>` was not in dependencies.
   packageNotFound,
 
-  /// The command string was '<package>:<binary>' or ':<binary>' and <binary>
+  /// The command string was `<package>:<binary>` or `:<binary>` and `<binary>`
   /// was not found.
   noBinaryFound,
 
@@ -531,13 +526,11 @@ class Executable {
     );
   }
 
-  /// The location of the snapshot of the dart program at [path] in [package]
-  /// will be stored here.
+  /// The location of the snapshot of the dart program at [relativePath] in
+  /// [package] will be stored here.
   ///
   /// We use the sdk version to make sure we don't run snapshots from a
   /// different sdk.
-  ///
-  /// [path] must be relative.
   String pathOfSnapshot(String rootDir) {
     assert(p.isRelative(relativePath));
     final versionSuffix = sdk.version;

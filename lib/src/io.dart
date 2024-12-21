@@ -21,7 +21,6 @@ import 'package:meta/meta.dart';
 import 'package:path/path.dart' as p;
 import 'package:pool/pool.dart';
 import 'package:stack_trace/stack_trace.dart';
-// ignore: prefer_relative_imports
 import 'package:tar/tar.dart';
 
 import 'error_group.dart';
@@ -106,8 +105,8 @@ FileStat statPath(String path) {
 
 /// Returns the canonical path for [pathString].
 ///
-/// This is the normalized, absolute path, with symlinks resolved. As in
-/// [transitiveTarget], broken or recursive symlinks will not be fully resolved.
+/// This is the normalized, absolute path, with symlinks resolved. Broken or
+/// recursive symlinks will not be fully resolved.
 ///
 /// This doesn't require [pathString] to point to a path that exists on the
 /// filesystem; nonexistent or unreadable path entries are treated as normal
@@ -320,7 +319,7 @@ String ensureDir(String dir) {
   return dir;
 }
 
-/// Creates a temp directory in [dir], whose name will be [prefix] with
+/// Creates a temp directory in [base], whose name will be [prefix] with
 /// characters appended to it to make a unique name.
 ///
 /// Returns the path of the created directory.
@@ -383,15 +382,15 @@ List<String> listDir(
         if (entity is Link) return false;
         if (includeHidden) return true;
 
-        // Using substring here is generally problematic in cases where dir has one
-        // or more trailing slashes. If you do listDir("foo"), you'll get back
-        // paths like "foo/bar". If you do listDir("foo/"), you'll get "foo/bar"
-        // (note the trailing slash was dropped. If you do listDir("foo//"), you'll
-        // get "foo//bar".
+        // Using substring here is generally problematic in cases where dir has
+        // one or more trailing slashes. If you do listDir("foo"), you'll get
+        // back paths like "foo/bar". If you do listDir("foo/"), you'll get
+        // "foo/bar" (note the trailing slash was dropped. If you do
+        // listDir("foo//"), you'll get "foo//bar".
         //
-        // This means if you strip off the prefix, the resulting string may have a
-        // leading separator (if the prefix did not have a trailing one) or it may
-        // not. However, since we are only using the results of that to call
+        // This means if you strip off the prefix, the resulting string may have
+        // a leading separator (if the prefix did not have a trailing one) or it
+        // may not. However, since we are only using the results of that to call
         // contains() on, the leading separator is harmless.
         assert(entity.path.startsWith(dir));
         var pathInDir = entity.path.substring(dir.length);
@@ -571,7 +570,8 @@ bool _isDirectoryNotEmptyException(FileSystemException e) {
       // https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/include/uapi/asm-generic/errno-base.h#n21
       // https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/include/uapi/asm-generic/errno.h#n20
       (Platform.isLinux && (errorCode == 39 || errorCode == 17)) ||
-          // On Windows this may fail with ERROR_DIR_NOT_EMPTY or ERROR_ALREADY_EXISTS
+          // On Windows this may fail with ERROR_DIR_NOT_EMPTY or
+          // ERROR_ALREADY_EXISTS
           // https://docs.microsoft.com/en-us/windows/win32/debug/system-error-codes--0-499-
           (Platform.isWindows && (errorCode == 145 || errorCode == 183)) ||
           // On MacOS rename will fail with ENOTEMPTY if directory exists.
@@ -739,7 +739,8 @@ bool get terminalOutputForStdout {
     return true;
   } else {
     throw DataException(
-      'Environment variable ${EnvironmentKeys.forceTerminalOutput} has unsupported value: $environmentValue.',
+      'Environment variable ${EnvironmentKeys.forceTerminalOutput} has '
+      'unsupported value: $environmentValue.',
     );
   }
 }
@@ -774,14 +775,14 @@ Future flushThenExit(int status) {
 /// The spawned process will inherit its parent's environment variables. If
 /// [environment] is provided, that will be used to augment (not replace) the
 /// the inherited variables.
-Future<PubProcessResult> runProcess(
+Future<StringProcessResult> runProcess(
   String executable,
   List<String> args, {
   String? workingDir,
   Map<String, String>? environment,
   bool runInShell = false,
-  Encoding? stdoutEncoding = systemEncoding,
-  Encoding? stderrEncoding = systemEncoding,
+  Encoding stdoutEncoding = systemEncoding,
+  Encoding stderrEncoding = systemEncoding,
 }) {
   ArgumentError.checkNotNull(executable, 'executable');
 
@@ -805,13 +806,12 @@ Future<PubProcessResult> runProcess(
       );
     }
 
-    final pubResult = PubProcessResult(
+    log.processResult(executable, result);
+    return StringProcessResult(
       result.stdout as String,
       result.stderr as String,
       result.exitCode,
     );
-    log.processResult(executable, pubResult);
-    return pubResult;
   });
 }
 
@@ -856,14 +856,14 @@ Future<PubProcess> startProcess(
 }
 
 /// Like [runProcess], but synchronous.
-PubProcessResult runProcessSync(
+StringProcessResult runProcessSync(
   String executable,
   List<String> args, {
   String? workingDir,
   Map<String, String>? environment,
   bool runInShell = false,
-  Encoding? stdoutEncoding = systemEncoding,
-  Encoding? stderrEncoding = systemEncoding,
+  Encoding stdoutEncoding = systemEncoding,
+  Encoding stderrEncoding = systemEncoding,
 }) {
   ArgumentError.checkNotNull(executable, 'executable');
   ProcessResult result;
@@ -882,13 +882,67 @@ PubProcessResult runProcessSync(
   } on IOException catch (e) {
     throw RunProcessException('Pub failed to run subprocess `$executable`: $e');
   }
-  final pubResult = PubProcessResult(
+  log.processResult(executable, result);
+  return StringProcessResult(
     result.stdout as String,
     result.stderr as String,
     result.exitCode,
   );
-  log.processResult(executable, pubResult);
-  return pubResult;
+}
+
+/// Like [runProcess], but synchronous.
+/// Always outputs stdout as `List<int>`.
+BytesProcessResult runProcessSyncBytes(
+  String executable,
+  List<String> args, {
+  String? workingDir,
+  Map<String, String>? environment,
+  bool runInShell = false,
+  Encoding stderrEncoding = systemEncoding,
+}) {
+  ProcessResult result;
+  try {
+    (executable, args) =
+        _sanitizeExecutablePath(executable, args, workingDir: workingDir);
+    result = Process.runSync(
+      executable,
+      args,
+      workingDirectory: workingDir,
+      environment: environment,
+      runInShell: runInShell,
+      stdoutEncoding: null,
+      stderrEncoding: stderrEncoding,
+    );
+  } on IOException catch (e) {
+    throw RunProcessException('Pub failed to run subprocess `$executable`: $e');
+  }
+  log.processResult(executable, result);
+  return BytesProcessResult(
+    result.stdout as List<int>,
+    result.stderr as String,
+    result.exitCode,
+  );
+}
+
+/// Adaptation of ProcessResult when stdout is a `List<String>`.
+class StringProcessResult {
+  final String stdout;
+  final String stderr;
+  final int exitCode;
+  StringProcessResult(this.stdout, this.stderr, this.exitCode);
+  bool get success => exitCode == exit_codes.SUCCESS;
+}
+
+/// Adaptation of ProcessResult when stdout is a `List<bytes>`.
+class BytesProcessResult {
+  final Uint8List stdout;
+  final String stderr;
+  final int exitCode;
+  BytesProcessResult(List<int> stdout, this.stderr, this.exitCode)
+      :
+        // Not clear that we need to do this, but seems harmless.
+        stdout = stdout is Uint8List ? stdout : Uint8List.fromList(stdout);
+  bool get success => exitCode == exit_codes.SUCCESS;
 }
 
 /// A wrapper around [Process] that exposes `dart:async`-style APIs.
@@ -1226,26 +1280,6 @@ ByteStream createTarGz(
         .transform(tarWriterWith(format: OutputFormat.gnuLongName))
         .transform(gzip.encoder),
   );
-}
-
-/// Contains the results of invoking a [Process] and waiting for it to complete.
-class PubProcessResult {
-  final List<String> stdout;
-  final List<String> stderr;
-  final int exitCode;
-
-  PubProcessResult(String stdout, String stderr, this.exitCode)
-      : stdout = _toLines(stdout),
-        stderr = _toLines(stderr);
-
-  // TODO(rnystrom): Remove this and change to returning one string.
-  static List<String> _toLines(String output) {
-    final lines = splitLines(output);
-    if (lines.isNotEmpty && lines.last == '') lines.removeLast();
-    return lines;
-  }
-
-  bool get success => exitCode == exit_codes.SUCCESS;
 }
 
 /// The location for dart-specific configuration.

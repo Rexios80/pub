@@ -5,6 +5,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:path/path.dart' as p;
 
@@ -22,25 +23,35 @@ class GitignoreValidator extends Validator {
   @override
   Future<void> validate() async {
     if (package.inGitRepo) {
-      late final List<String> checkedIntoGit;
+      final Uint8List output;
       try {
-        checkedIntoGit = git.runSync(
+        output = git.runSyncBytes(
           [
             '-c',
             'core.quotePath=false',
             'ls-files',
+            '-z',
             '--cached',
             '--exclude-standard',
             '--recurse-submodules',
           ],
           workingDir: package.dir,
-          stdoutEncoding: const Utf8Codec(),
         );
       } on git.GitException catch (e) {
         log.fine('Could not run `git ls-files` files in repo (${e.message}).');
         // This validation is only a warning.
         // If git is not supported on the platform, or too old to support
         // --recurse-submodules we just continue silently.
+        return;
+      }
+
+      final List<String> checkedIntoGit;
+      try {
+        checkedIntoGit = git.splitZeroTerminated(output).map((b) {
+          return utf8.decode(b);
+        }).toList();
+      } on FormatException catch (e) {
+        log.fine('Failed decoding git output. Skipping validation. $e.');
         return;
       }
       final root = git.repoRoot(package.dir) ?? package.dir;
@@ -60,13 +71,11 @@ class GitignoreValidator extends Validator {
       final unignoredByGitignore = Ignore.listFiles(
         beneath: beneath,
         listDir: (dir) {
-          final contents = Directory(resolve(dir)).listSync();
-          return contents
-              .where((e) => !(linkExists(e.path) && dirExists(e.path)))
-              .map(
-                (entity) => p.posix
-                    .joinAll(p.split(p.relative(entity.path, from: root))),
-              );
+          final contents = Directory(resolve(dir)).listSync(followLinks: false);
+          return contents.map(
+            (entity) =>
+                p.posix.joinAll(p.split(p.relative(entity.path, from: root))),
+          );
         },
         ignoreForDir: (dir) {
           final gitIgnore = resolve('$dir/.gitignore');
@@ -75,7 +84,10 @@ class GitignoreValidator extends Validator {
           ];
           return rules.isEmpty ? null : Ignore(rules);
         },
-        isDir: (dir) => dirExists(resolve(dir)),
+        isDir: (dir) {
+          final resolved = resolve(dir);
+          return dirExists(resolved) && !linkExists(resolved);
+        },
       ).map((file) {
         final relative = p.relative(resolve(file), from: package.dir);
         return Platform.isWindows

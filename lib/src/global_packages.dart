@@ -13,6 +13,7 @@ import 'entrypoint.dart';
 import 'exceptions.dart';
 import 'executable.dart' as exec;
 import 'io.dart';
+import 'language_version.dart';
 import 'lock_file.dart';
 import 'log.dart' as log;
 import 'package.dart';
@@ -28,6 +29,7 @@ import 'source/git.dart';
 import 'source/hosted.dart';
 import 'source/path.dart';
 import 'source/root.dart';
+import 'source/sdk.dart';
 import 'system_cache.dart';
 import 'utils.dart';
 
@@ -45,7 +47,7 @@ import 'utils.dart';
 /// For a cached source, the package is physically in the user's pub cache and
 /// we don't want to mess with it by putting a lockfile in there. Instead, when
 /// we activate the package, we create a full lockfile and put it in the
-/// "global_packages" directory. It's named "<package>.lock". Unlike a normal
+/// "global_packages" directory. It's named `"<package>.lock"`. Unlike a normal
 /// lockfile, it also contains an entry for the root package itself, so that we
 /// know the version and description that was activated.
 ///
@@ -81,8 +83,6 @@ class GlobalPackages {
   /// If `null`, all executables in the package will get binstubs. If empty, no
   /// binstubs will be created.
   ///
-  /// The [features] map controls which features of the package to activate.
-  ///
   /// If [overwriteBinStubs] is `true`, any binstubs that collide with
   /// existing binstubs in other packages will be overwritten by this one's.
   /// Otherwise, the previous ones will be preserved.
@@ -115,6 +115,7 @@ class GlobalPackages {
           if (ref != null) 'ref': ref,
         },
         containingDescription: RootDescription(p.current),
+        languageVersion: LanguageVersion.fromVersion(sdk.version),
       );
     } on FormatException catch (e) {
       throw ApplicationException(e.message);
@@ -132,22 +133,28 @@ class GlobalPackages {
         'pub global activate',
         dependencies: [dep],
         sources: cache.sources,
+        sdkConstraints: {
+          'dart': SdkConstraint.interpretDartSdkConstraint(
+            VersionConstraint.parse('>=2.12.0'),
+            defaultUpperBoundConstraint: null,
+          ),
+        },
       ),
       dir,
       [],
     );
   }
 
-  /// Finds the latest version of the hosted package with [name] that matches
-  /// [constraint] and makes it the active global version.
+  /// Finds the latest version of the hosted package that matches [range] and
+  /// makes it the active global version.
   ///
   /// [executables] is the names of the executables that should have binstubs.
   /// If `null`, all executables in the package will get binstubs. If empty, no
   /// binstubs will be created.
   ///
-  /// if [overwriteBinStubs] is `true`, any binstubs that collide with
-  /// existing binstubs in other packages will be overwritten by this one's.
-  /// Otherwise, the previous ones will be preserved.
+  /// if [overwriteBinStubs] is `true`, any binstubs that collide with existing
+  /// binstubs in other packages will be overwritten by this one's. Otherwise,
+  /// the previous ones will be preserved.
   ///
   /// [url] is an optional custom pub server URL. If not null, the package to be
   /// activated will be fetched from this URL instead of the default pub URL.
@@ -425,7 +432,7 @@ try:
     return entrypoint;
   }
 
-  /// Runs [package]'s [executable] with [args].
+  /// Runs [executable] with [args].
   ///
   /// If [executable] is available in its built form, that will be
   /// recompiled if the SDK has been upgraded since it was first compiled and
@@ -449,6 +456,75 @@ try:
       args,
       enableAsserts: enableAsserts,
       recompile: (exectuable) async {
+        final root = entrypoint.workspaceRoot;
+        final name = exectuable.package;
+
+        // When recompiling we re-resolve it and download its dependencies. This
+        // is mainly to protect from the case where the sdk was updated, and
+        // that causes some incompatibilities. (could be the new sdk is outside
+        // some package's environment constraint range, or that the sdk came
+        // with incompatible versions of sdk packages).
+        //
+        // We use --enforce-lockfile semantics, because we want upgrading
+        // globally activated packages to be conscious, and not a part of
+        // running them.
+        SolveResult result;
+        try {
+          result = await log.spinner(
+            'Resolving dependencies',
+            () => resolveVersions(SolveType.get, cache, root),
+          );
+        } on SolveFailure catch (e) {
+          log.error(e.message);
+          fail('''The package `$name` as currently activated cannot resolve.
+
+Try reactivating the package.
+`$topLevelProgram pub global activate $name`          
+''');
+        }
+        // We want the entrypoint to be rooted at 'dep' not the dummy-package.
+        result.packages.removeWhere((id) => id.name == 'pub global activate');
+
+        final newLockFile = await result.downloadCachedPackages(cache);
+        final report = SolveReport(
+          SolveType.get,
+          entrypoint.workspaceRoot.dir,
+          entrypoint.workspaceRoot.pubspec,
+          entrypoint.workspaceRoot.allOverridesInWorkspace,
+          entrypoint.lockFile,
+          newLockFile,
+          result.availableVersions,
+          cache,
+          dryRun: true,
+          enforceLockfile: true,
+          quiet: false,
+        );
+        await report.show(summary: true);
+
+        final sameVersions = entrypoint.lockFile.samePackageIds(newLockFile);
+
+        if (!sameVersions) {
+          if (newLockFile.packages.values.any((p) {
+            return p.source is SdkSource &&
+                p.version != entrypoint.lockFile.packages[p.name]?.version;
+          })) {
+            // More specific error message for the case of a version match with
+            // an sdk package.
+            dataError('''
+The current activation of `$name` is not compatible with your current SDK.
+
+Try reactivating the package.
+`$topLevelProgram pub global activate $name`
+''');
+          } else {
+            dataError('''
+The current activation of `$name` cannot resolve to the same set of dependencies.
+
+Try reactivating the package.
+`$topLevelProgram pub global activate $name`
+''');
+          }
+        }
         await recompile(exectuable);
         _refreshBinStubs(entrypoint, executable);
       },
@@ -644,12 +720,12 @@ try:
   /// If `null`, all executables in the package will get binstubs. If empty, no
   /// binstubs will be created.
   ///
-  /// If [overwriteBinStubs] is `true`, any binstubs that collide with
-  /// existing binstubs in other packages will be overwritten by this one's.
-  /// Otherwise, the previous ones will be preserved.
+  /// If [overwriteBinStubs] is `true`, any binstubs that collide with existing
+  /// binstubs in other packages will be overwritten by this one's. Otherwise,
+  /// the previous ones will be preserved.
   ///
-  /// If [suggestIfNotOnPath] is `true` (the default), this will warn the user if
-  /// the bin directory isn't on their path.
+  /// If [suggestIfNotOnPath] is `true` (the default), this will warn the user
+  /// if the bin directory isn't on their path.
   void _updateBinStubs(
     Entrypoint entrypoint,
     Package package,

@@ -11,6 +11,7 @@ import 'package:path/path.dart' as p;
 
 import 'command.dart' show PubTopLevel, lineLength;
 import 'command/add.dart';
+import 'command/bump.dart';
 import 'command/cache.dart';
 import 'command/deps.dart';
 import 'command/downgrade.dart';
@@ -27,6 +28,7 @@ import 'command/unpack.dart';
 import 'command/upgrade.dart';
 import 'command/uploader.dart';
 import 'command/version.dart';
+import 'command/workspace.dart';
 import 'exit_codes.dart' as exit_codes;
 import 'git.dart' as git;
 import 'io.dart';
@@ -139,6 +141,7 @@ class PubCommandRunner extends CommandRunner<int> implements PubTopLevel {
     // When adding new commands be sure to also add them to
     // `pub_embeddable_command.dart`.
     addCommand(AddCommand());
+    addCommand(BumpCommand());
     addCommand(CacheCommand());
     addCommand(DepsCommand());
     addCommand(DowngradeCommand());
@@ -154,6 +157,7 @@ class PubCommandRunner extends CommandRunner<int> implements PubTopLevel {
     addCommand(LoginCommand());
     addCommand(LogoutCommand());
     addCommand(VersionCommand());
+    addCommand(WorkspaceCommand());
     addCommand(TokenCommand());
   }
 
@@ -203,7 +207,7 @@ class PubCommandRunner extends CommandRunner<int> implements PubTopLevel {
     final pubRoot = p.dirname(p.dirname(p.fromUri(Platform.script)));
     try {
       actualRev =
-          git.runSync(['rev-parse', 'HEAD'], workingDir: pubRoot).single;
+          git.runSync(['rev-parse', 'HEAD'], workingDir: pubRoot).trim();
     } on git.GitException catch (_) {
       // When building for Debian, pub isn't checked out via git.
       return;

@@ -215,16 +215,14 @@ extension AttachHeaders on http.Request {
 /// "some message"}}`. If the format is correct, the message will be printed;
 /// otherwise an error will be raised.
 void handleJsonSuccess(http.Response response) {
-  final parsed = parseJsonResponse(response);
-  final success = parsed['success'];
-  if (success is! Map ||
-      !(parsed['success'] as Map).containsKey('message') ||
-      parsed['success']['message'] is! String) {
-    invalidServerResponse(response);
+  switch (parseJsonResponse(response)) {
+    case {'success': {'message': final String message}}:
+      log.message(
+        'Message from server: ${log.green(sanitizeForTerminal(message))}',
+      );
+    default:
+      invalidServerResponse(response);
   }
-  log.message(
-    'Message from server: ${log.green(sanitizeForTerminal(parsed['success']['message'] as String))}',
-  );
 }
 
 /// Handles an unsuccessful JSON-formatted response from pub.dev.
@@ -245,8 +243,10 @@ void handleJsonError(http.BaseResponse response) {
       error['message'] is! String) {
     invalidServerResponse(response);
   }
+  final formattedMessage =
+      log.red(sanitizeForTerminal(error['message'] as String));
   fail(
-    'Message from server: ${log.red(sanitizeForTerminal(error['message'] as String))}',
+    'Message from server: $formattedMessage',
   );
 }
 
@@ -270,7 +270,8 @@ void handleGCSError(http.BaseResponse response) {
       final code = getTagText('Code');
       // TODO(sigurdm): we could hard-code nice error messages for known codes.
       final message = getTagText('Message');
-      // `Details` are not specified in the doc above, but have been observed in actual responses.
+      // `Details` are not specified in the doc above, but have been observed in
+      // actual responses.
       final details = getTagText('Details');
       if (code != null) {
         log.error('Server error code: ${sanitizeForTerminal(code)}');
@@ -427,7 +428,7 @@ extension RequestSending on http.Client {
   /// when you need to send a request object but want a regular response object.
   ///
   /// If false is passed for [throwIfNotOk], the response will not be validated.
-  /// See [http.BaseResponse.throwIfNotOk] extension for validation details.
+  /// See [http.BaseResponse] extension for validation details.
   Future<http.Response> fetch(
     http.BaseRequest request, {
     bool throwIfNotOk = true,
@@ -444,7 +445,7 @@ extension RequestSending on http.Client {
   /// is successful, returns a [http.StreamedResponse].
   ///
   /// If false is passed for [throwIfNotOk], the response will not be validated.
-  /// See [http.BaseResponse.throwIfNotOk] extension for validation details.
+  /// See [Throwing.throwIfNotOk] extension for validation details.
   Future<http.StreamedResponse> fetchAsStream(
     http.BaseRequest request, {
     bool throwIfNotOk = true,

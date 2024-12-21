@@ -39,8 +39,9 @@ class SystemCache {
   String get tempDir => p.join(rootDir, '_temp');
 
   static String defaultDir = (() {
-    if (Platform.environment.containsKey('PUB_CACHE')) {
-      return p.absolute(Platform.environment['PUB_CACHE']!);
+    final envCache = Platform.environment['PUB_CACHE'];
+    if (envCache != null) {
+      return envCache;
     } else if (Platform.isWindows) {
       // %LOCALAPPDATA% is used as the cache location over %APPDATA%, because
       // the latter is synchronised between devices when the user roams between
@@ -213,11 +214,6 @@ Consider setting the `PUB_CACHE` variable manually.
   ///
   /// [id] must refer to a cached package.
   ///
-  /// If [allowOutdatedHashChecks] is `true` we use a cached version listing
-  /// response if present instead of probing the server. Not probing allows for
-  /// `pub get` with a filled cache to be a fast case that doesn't require any
-  /// new version-listings.
-  ///
   /// Returns [id] with an updated [ResolvedDescription], this can be different
   /// if the content-hash changed while downloading.
   Future<DownloadPackageResult> downloadPackage(PackageId id) async {
@@ -312,17 +308,15 @@ Consider setting the `PUB_CACHE` variable manually.
   ///
   /// If DEPRECATED.md is less than 7 days old, we don't repeat the warning.
   void _checkOldCacheLocation() {
-    // Background:
-    // Prior to Dart 2.8 the default location for the PUB_CACHE on Windows was:
-    //   %APPDATA%\Pub\Cache
+    // Background: Prior to Dart 2.8 the default location for the PUB_CACHE on
+    // Windows was: %APPDATA%\Pub\Cache
     //
     // Start Dart 2.8 pub started migrating the default PUB_CACHE location to:
-    //   %LOCALAPPDATA%\Pub\Cache
-    // That is:
-    //  * If a pub-cache existed in `%LOCALAPPDATA%\Pub\Cache` then it
-    //    would be used.
-    //  * If a pub-cache existed in `%APPDATA%\Pub\Cache` then it would be
-    //    used, unless a pub-cache in `%LOCALAPPDATA%\Pub\Cache` had been found.
+    //   %LOCALAPPDATA%\Pub\Cache That is:
+    //  * If a pub-cache existed in `%LOCALAPPDATA%\Pub\Cache` then it would be
+    //    used.
+    //  * If a pub-cache existed in `%APPDATA%\Pub\Cache` then it would be used,
+    //    unless a pub-cache in `%LOCALAPPDATA%\Pub\Cache` had been found.
     //  * If no pub-cache was found, a new empty pub-cache was created in
     //    `%LOCALAPPDATA%\Pub\Cache`.
     //
@@ -330,13 +324,14 @@ Consider setting the `PUB_CACHE` variable manually.
     // `%APPDATA%\Pub\Cache`. Instead it will always use the new location,
     // `%LOCALAPPDATA%\Pub\Cache`, as default PUB_CACHE location.
     //
-    // Using `%APPDATA%` caused the pub-cache to be copied with the user-profile,
-    // when using a networked Windows setup where users can login on multiple
-    // machines. This is undesirable because you are moving a lot of bytes over
-    // the network and onto whatever servers are storing the user profiles.
+    // Using `%APPDATA%` caused the pub-cache to be copied with the
+    // user-profile, when using a networked Windows setup where users can login
+    // on multiple machines. This is undesirable because you are moving a lot of
+    // bytes over the network and onto whatever servers are storing the user
+    // profiles.
     //
-    // Thus, we migrated to storing the pub-cache in `%LOCALAPPDATA%`.
-    // And finished the migration in Dart 3 to keep things simple.
+    // Thus, we migrated to storing the pub-cache in `%LOCALAPPDATA%`. And
+    // finished the migration in Dart 3 to keep things simple.
     if (!Platform.isWindows) return;
 
     final appData = Platform.environment['APPDATA'];

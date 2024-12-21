@@ -31,6 +31,11 @@ Future<List<FlutterRelease>> _flutterReleases = () async {
   }
   final result = <FlutterRelease>[];
   for (final release in releases) {
+    if (release is! Map) {
+      throw const FormatException(
+        'Bad response - releases should be a list of maps.',
+      );
+    }
     final channel = {
       'beta': Channel.beta,
       'stable': Channel.stable,
@@ -104,6 +109,7 @@ class FlutterRelease {
     required this.channel,
   });
   @override
-  String toString() =>
-      'FlutterRelease(flutter=$flutterVersion, dart=$dartVersion, channel=$channel)';
+  String toString() => 'FlutterRelease(flutter=$flutterVersion, '
+      'dart=$dartVersion, '
+      'channel=$channel)';
 }

@@ -38,8 +38,8 @@ class Pubspec extends PubspecBase {
   // initialization can throw a [PubspecException], that error should also be
   // exposed through [allErrors].
 
-  /// The fields of [pubspecOverridesFilename]. `null` if no such file exists or has
-  /// to be considered.
+  /// The fields of [pubspecOverridesFilename]. `null` if no such file exists or
+  /// has to be considered.
   final YamlMap? _overridesFileFields;
 
   String? get _packageName => fields['name'] != null ? name : null;
@@ -66,19 +66,27 @@ class Pubspec extends PubspecBase {
   /// Directories of packages that should resolve together with this package.
   late List<String> workspace = () {
     final result = <String>[];
-    final r = fields.nodes['workspace'];
-    if (r != null && !languageVersion.supportsWorkspaces) {
+    final workspaceNode =
+        _overridesFileFields?.nodes['workspace'] ?? fields.nodes['workspace'];
+    if (workspaceNode != null && !languageVersion.supportsWorkspaces) {
       _error(
-        '`workspace` and `resolution` requires at least language version ${LanguageVersion.firstVersionWithWorkspaces}',
-        r.span,
+        '`workspace` and `resolution` requires at least language version '
+        '${LanguageVersion.firstVersionWithWorkspaces}',
+        workspaceNode.span,
+        hint: '''
+Consider updating the SDK constraint to:
+
+environment:
+  sdk: '^${sdk.version}'
+''',
       );
     }
-    if (r == null || r.value == null) return <String>[];
+    if (workspaceNode == null || workspaceNode.value == null) return <String>[];
 
-    if (r is! YamlList) {
-      _error('"workspace" must be a list of strings', r.span);
+    if (workspaceNode is! YamlList) {
+      _error('"workspace" must be a list of strings', workspaceNode.span);
     }
-    for (final t in r.nodes) {
+    for (final t in workspaceNode.nodes) {
       final value = t.value;
       if (value is! String) {
         _error('"workspace" must be a list of strings', t.span);
@@ -96,21 +104,30 @@ class Pubspec extends PubspecBase {
 
   /// The resolution mode.
   late Resolution resolution = () {
-    final r = fields.nodes['resolution'];
-    if (r != null && !languageVersion.supportsWorkspaces) {
+    final resolutionNode =
+        _overridesFileFields?.nodes['resolution'] ?? fields.nodes['resolution'];
+
+    if (resolutionNode != null && !languageVersion.supportsWorkspaces) {
       _error(
-        '`workspace` and `resolution` requires at least language version ${LanguageVersion.firstVersionWithWorkspaces}',
-        r.span,
+        '`workspace` and `resolution` requires at least language version '
+        '${LanguageVersion.firstVersionWithWorkspaces}',
+        resolutionNode.span,
+        hint: '''
+Consider updating the SDK constraint to:
+
+environment:
+  sdk: '^${sdk.version}'
+''',
       );
     }
-    return switch (r?.value) {
+    return switch (resolutionNode?.value) {
       null => Resolution.none,
       'local' => Resolution.local,
       'workspace' => Resolution.workspace,
       'external' => Resolution.external,
       _ => _error(
           '"resolution" must be one of `workspace`, `local`, `external`',
-          r!.span,
+          resolutionNode!.span,
         )
     };
   }();
@@ -141,26 +158,18 @@ class Pubspec extends PubspecBase {
 
   Map<String, PackageRange>? _devDependencies;
 
-  /// The dependency constraints that this package overrides when it is the
-  /// root package.
+  /// The dependency constraints that this package overrides when it is the root
+  /// package.
   ///
   /// Dependencies here will replace any dependency on a package with the same
   /// name anywhere in the dependency graph.
   ///
-  /// These can occur both in the pubspec.yaml file and the [pubspecOverridesFilename].
+  /// These can occur both in the pubspec.yaml file and the
+  /// [pubspecOverridesFilename].
   Map<String, PackageRange> get dependencyOverrides {
     if (_dependencyOverrides != null) return _dependencyOverrides!;
     final pubspecOverridesFields = _overridesFileFields;
     if (pubspecOverridesFields != null) {
-      pubspecOverridesFields.nodes.forEach((key, _) {
-        final keyNode = key as YamlNode;
-        if (!const {'dependency_overrides'}.contains(keyNode.value)) {
-          throw SourceSpanApplicationException(
-            'pubspec_overrides.yaml only supports the `dependency_overrides` field.',
-            keyNode.span,
-          );
-        }
-      });
       if (pubspecOverridesFields.containsKey('dependency_overrides')) {
         _dependencyOverrides = _parseDependencies(
           'dependency_overrides',
@@ -344,8 +353,8 @@ class Pubspec extends PubspecBase {
         sources = sources ??
             ((String? name) => throw StateError('No source registry given')),
         _overridesFileFields = null,
-        // This is a dummy value.
-        // Dependencies should already be resolved, so we never need to do relative resolutions.
+        // This is a dummy value. Dependencies should already be resolved, so we
+        // never need to do relative resolutions.
         _containingDescription = RootDescription('.'),
         super(
           fields == null ? YamlMap() : YamlMap.wrap(fields),
@@ -357,7 +366,7 @@ class Pubspec extends PubspecBase {
   /// contents.
   ///
   /// If [expectedName] is passed and the pubspec doesn't have a matching name
-  /// field, this will throw a [PubspecError].
+  /// field, this will throw an [ApplicationException].
   ///
   /// [location] is the location from which this pubspec was loaded.
   Pubspec.fromMap(
@@ -378,6 +387,19 @@ class Pubspec extends PubspecBase {
               ? fields
               : YamlMap.wrap(fields, sourceUrl: location),
         ) {
+    if (overridesFields != null) {
+      overridesFields.nodes.forEach((key, _) {
+        final keyNode = key as YamlNode;
+        if (!const {'dependency_overrides', 'resolution', 'workspace'}
+            .contains(keyNode.value)) {
+          throw SourceSpanApplicationException(
+            'pubspec_overrides.yaml only supports the '
+            '`dependency_overrides`, `resolution` and `workspace` fields.',
+            keyNode.span,
+          );
+        }
+      });
+    }
     // If [expectedName] is passed, ensure that the actual 'name' field exists
     // and matches the expectation.
     if (expectedName == null) return;
@@ -487,7 +509,8 @@ class Pubspec extends PubspecBase {
     return errors;
   }
 
-  /// Returns a list of errors relevant to consuming this pubspec as a dependency
+  /// Returns a list of errors relevant to consuming this pubspec as a
+  /// dependency
   ///
   /// This will return at most one error for each field.
   List<SourceSpanApplicationException> get dependencyErrors =>
@@ -597,7 +620,7 @@ Map<String, PackageRange> _parseDependencies(
           fileType,
         );
         final otherEntries = specNode.nodes.entries
-            .where((entry) => entry.key.value != 'version')
+            .where((entry) => (entry.key as YamlNode).value != 'version')
             .toList();
         if (otherEntries.length > 1) {
           _error('A dependency may only have one source.', specNode.span);
@@ -652,9 +675,9 @@ Map<String, PackageRange> _parseDependencies(
 
 /// Parses [node] to a [VersionConstraint].
 ///
-/// If or [defaultUpperBoundConstraint] is specified then it will be set as the
-/// max constraint if the original constraint doesn't have an upper bound and it
-/// is compatible with [defaultUpperBoundConstraint].
+/// `null` is interpreted as [VersionConstraint.any].
+///
+/// A String is parsed with [VersionConstraint.parse].
 VersionConstraint _parseVersionConstraint(
   YamlNode? node,
   String? packageName,
@@ -715,8 +738,8 @@ T _wrapFormatException<T>(
 }
 
 /// Throws a [SourceSpanApplicationException] with the given message.
-Never _error(String message, SourceSpan? span) {
-  throw SourceSpanApplicationException(message, span);
+Never _error(String message, SourceSpan? span, {String? hint}) {
+  throw SourceSpanApplicationException(message, span, hint: hint);
 }
 
 enum _FileType {
@@ -828,8 +851,13 @@ class SdkConstraint {
 }
 
 enum Resolution {
+  // Still unused.
   external,
+  // This package is a member of a workspace, and should be resolved with a
+  // pubspec.yaml located higher.
   workspace,
+  // Still unused.
   local,
+  // This package is at the root of a workspace.
   none,
 }

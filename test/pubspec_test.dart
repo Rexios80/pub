@@ -24,6 +24,7 @@ void main() {
       String contents,
       void Function(Pubspec) fn, {
       String? expectedContains,
+      String? hintContains,
       Description? containingDescription,
     }) {
       var expectation = const TypeMatcher<SourceSpanApplicationException>();
@@ -32,6 +33,13 @@ void main() {
           (error) => error.message,
           'message',
           contains(expectedContains),
+        );
+      }
+      if (hintContains != null) {
+        expectation = expectation.having(
+          (error) => error.hint,
+          'hint',
+          contains(hintContains),
         );
       }
 
@@ -384,6 +392,14 @@ environment:
 workspace: ['a', 'b', 'c']
 ''',
         (p) => p.workspace,
+        expectedContains: '`workspace` and `resolution` '
+            'requires at least language version 3.5',
+        hintContains: '''
+Consider updating the SDK constraint to:
+
+environment:
+  sdk: '^${Platform.version.split(' ').first}'
+''',
       );
       // but no error if you don't look at it.
       expect(
@@ -406,9 +422,17 @@ resolution: workspace
         '''
 environment:
   sdk: ^1.2.3
-resolution: local
+resolution: workspace
 ''',
         (p) => p.resolution,
+        expectedContains: '`workspace` and `resolution` '
+            'requires at least language version 3.5',
+        hintContains: '''
+Consider updating the SDK constraint to:
+
+environment:
+  sdk: '^${Platform.version.split(' ').first}'
+''',
       );
     });
 
@@ -470,7 +494,8 @@ dependencies:
         (pubspec) => pubspec.dependencies,
         expectedContains:
             'Invalid description in the "pkg" pubspec on the "from_path" '
-            'dependency: "non_local_path" is a relative path, but this isn\'t a '
+            'dependency: "non_local_path" is a relative path, '
+            'but this isn\'t a '
             'local pubspec.',
       );
     });
@@ -651,8 +676,8 @@ dependencies:
       url: https://example.org/pub/
 ''',
             (pubspec) => pubspec.dependencies,
-            expectedContains:
-                "The 'name' key must have a string value without a minimum Dart "
+            expectedContains: "The 'name' key must have a "
+                'string value without a minimum Dart '
                 'SDK constraint of 2.15.',
           );
         });
@@ -668,8 +693,8 @@ dependencies:
     hosted: http://pub.example.org
 ''',
               (pubspec) => pubspec.dependencies,
-              expectedContains:
-                  'Using `hosted: <url>` is only supported with a minimum SDK constraint of 2.15.',
+              expectedContains: 'Using `hosted: <url>` is only supported '
+                  'with a minimum SDK constraint of 2.15.',
             );
           },
         );
@@ -1035,8 +1060,13 @@ dependency_overrides:
           );
         }
 
-        final pubspec = parsePubspecOverrides(contents);
-        expect(() => fn(pubspec), throwsA(expectation));
+        expect(
+          () {
+            final pubspec = parsePubspecOverrides(contents);
+            fn(pubspec);
+          },
+          throwsA(expectation),
+        );
       }
 
       test('allows empty overrides file', () {
@@ -1080,7 +1110,8 @@ dependency_overrides:
       url: '::'
 ''',
           (pubspecOverrides) => pubspecOverrides.dependencyOverrides,
-          'Error on line 4, column 7 of ${Platform.pathSeparator}pubspec_overrides.yaml',
+          'Error on line 4, column 7 of '
+              '${Platform.pathSeparator}pubspec_overrides.yaml',
         );
       });
 
@@ -1101,6 +1132,40 @@ name: 'foo'
           (pubspecOverrides) => pubspecOverrides.dependencyOverrides,
         );
       });
+    });
+    test(
+        'Throws after language 3.7 '
+        'if using unknown keys in dependency description', () {
+      expectPubspecException(
+        '''
+environment:
+  sdk: 3.7.0
+dependencies:
+  foo:
+    hosted:
+      name: 'foo'
+      url: https://pub.dev/
+      someOtherProperty: 'smile'
+''',
+        (pubspec) => pubspec.dependencies,
+        expectedContains: 'Unknown key "someOtherProperty" in description.',
+      );
+
+      expectPubspecException(
+        '''
+environment:
+  sdk: 3.7.0
+dependencies:
+  test:
+    git:
+      ref: 'v1.0.0'
+      url: https://github.com/dart-lang/test
+      path: 'pkgs/test'
+      someOtherProperty: 'smile'
+''',
+        (pubspec) => pubspec.dependencies,
+        expectedContains: 'Unknown key "someOtherProperty" in description.',
+      );
     });
   });
 }

@@ -135,15 +135,15 @@ void main() {
       File(p.join(d.sandbox, appPath, 'pubspec.lock')).readAsStringSync(),
     );
     expect(
-      lockFile['packages']['bar']['description']['path'],
+      dig<String>(lockFile, ['packages', 'bar', 'description', 'path']),
       'pkgs/bar',
       reason: 'Use forward slashes for path',
     );
   });
 
   test(
-      'can have relative path dependencies to the repo root dir transitively from Git',
-      () async {
+      'can have relative path dependencies '
+      'to the repo root dir transitively from Git', () async {
     ensureGit();
 
     await d.git('foo.git', [
@@ -176,8 +176,8 @@ void main() {
   });
 
   test(
-      'cannot have relative path dependencies transitively from Git to outside the repo',
-      () async {
+      'cannot have relative path dependencies transitively from Git '
+      'to outside the repo', () async {
     ensureGit();
 
     await d.git('foo.git', [

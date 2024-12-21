@@ -38,9 +38,8 @@ class AnalysisContextManager {
 
   /// Parse the file with the given [path] into AST.
   ///
-  /// One of the containing directories must be used to create analysis
-  /// contexts using [createContextsForDirectory]. Throws [StateError] if
-  /// this has not been done.
+  /// One of the containing directories must have been used to create `this`.
+  /// Throws [StateError] otherwise.
   ///
   /// Throws [AnalyzerErrorGroup] is the file has parsing errors.
   CompilationUnit parse(String path) {
@@ -153,7 +152,8 @@ Future<void> precompile({
     // This should make this slightly easier to recognize in error reports.
     if (!fileExists(temporaryIncrementalDill)) {
       log.error(
-        'Compilation did not produce any result. Expected file at `$temporaryIncrementalDill`',
+        'Compilation did not produce any result. '
+        'Expected file at `$temporaryIncrementalDill`',
         result.dillOutput,
       );
     }

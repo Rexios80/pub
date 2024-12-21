@@ -8,6 +8,7 @@ library;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:args/command_runner.dart';
 import 'package:path/path.dart' as p;
@@ -43,8 +44,6 @@ const _maxTranscript = 10000;
 final Transcript<_Entry> _transcript = Transcript(_maxTranscript);
 
 /// The currently-animated progress indicator, if any.
-///
-/// This will also be in [_progresses].
 Progress? _animatedProgress;
 
 final _cyan = getAnsi('\u001b[36m');
@@ -232,15 +231,7 @@ void fine(String message) => write(Level.fine, message);
 
 /// Logs [message] at [level].
 void write(Level level, String message) {
-  message = message.toString();
-  final lines = splitLines(message);
-
-  // Discard a trailing newline. This is useful since StringBuffers often end
-  // up with an extra newline at the end from using [writeln].
-  if (lines.isNotEmpty && lines.last == '') {
-    lines.removeLast();
-  }
-
+  final lines = const LineSplitter().convert(message);
   final entry = _Entry(level, lines);
 
   final logFn = verbosity._loggers[level];
@@ -261,18 +252,22 @@ void process(
 }
 
 /// Logs the results of running [executable].
-void processResult(String executable, PubProcessResult result) {
+void processResult(String executable, ProcessResult result) {
   // Log it all as one message so that it shows up as a single unit in the logs.
   final buffer = StringBuffer();
   buffer.writeln('Finished $executable. Exit code ${result.exitCode}.');
 
-  void dumpOutput(String name, List<String> output) {
+  void dumpOutput(String name, dynamic output) {
+    if (output is! String) {
+      buffer.writeln('Binary output on $name.');
+      return;
+    }
     if (output.isEmpty) {
       buffer.writeln('Nothing output on $name.');
     } else {
       buffer.writeln('$name:');
       var numLines = 0;
-      for (var line in output) {
+      for (var line in output.split('\n')) {
         if (++numLines > 1000) {
           buffer.writeln('[${output.length - 1000}] more lines of output '
               'truncated...]');
@@ -640,4 +635,81 @@ class _JsonLogger {
 
     stdout.writeln(jsonEncode(message));
   }
+}
+
+/// Represents a string and its highlighting separately, such that we can
+/// compute the displayed length.
+class FormattedString {
+  final String value;
+
+  /// Should apply the ansi codes to present this string.
+  final String Function(String) _format;
+
+  /// A prefix for marking this string if colors are not used.
+  final String _prefix;
+
+  final String _suffix;
+
+  FormattedString(
+    this.value, {
+    String Function(String)? format,
+    String? prefix,
+    String? suffix,
+  })  : _format = format ?? _noFormat,
+        _prefix = prefix ?? '',
+        _suffix = suffix ?? '';
+
+  String formatted({required bool useColors}) {
+    return useColors
+        ? _format(_prefix + value + _suffix)
+        : _prefix + value + _suffix;
+  }
+
+  int computeLength({required bool? useColors}) {
+    return _prefix.length + value.length + _suffix.length;
+  }
+
+  static String _noFormat(String x) => x;
+}
+
+FormattedString format(
+  String value,
+  String Function(String) format, {
+  String? prefix = '',
+}) =>
+    FormattedString(value, format: format, prefix: prefix);
+
+/// Formats a table of [rows], inserting enough spaces to make columns line up.
+List<String> renderTable(
+  List<List<FormattedString>> rows,
+  bool useColors,
+) {
+  // Compute the width of each column by taking the max across all rows.
+  final columnWidths = <int, int>{};
+  for (var i = 0; i < rows.length; i++) {
+    if (rows[i].length > 1) {
+      for (var j = 0; j < rows[i].length; j++) {
+        final currentMaxWidth = columnWidths[j] ?? 0;
+        columnWidths[j] = max(
+          rows[i][j].computeLength(useColors: useColors),
+          currentMaxWidth,
+        );
+      }
+    }
+  }
+
+  final result = <String>[];
+  for (final row in rows) {
+    final b = StringBuffer();
+    for (var j = 0; j < row.length; j++) {
+      b.write(row[j].formatted(useColors: useColors));
+      b.write(
+        ' ' *
+            ((columnWidths[j]! + 2) -
+                row[j].computeLength(useColors: useColors)),
+      );
+    }
+    result.add(b.toString());
+  }
+  return result;
 }

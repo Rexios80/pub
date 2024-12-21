@@ -179,9 +179,10 @@ class Package {
             withPubspecOverrides: withPubspecOverrides,
           );
         } on FileException catch (e) {
+          final pubspecPath = p.join(dir, 'pubspec.yaml');
           throw FileException(
             '${e.message}\n'
-            'That was included in the workspace of ${p.join(dir, 'pubspec.yaml')}.',
+            'That was included in the workspace of $pubspecPath.',
             e.path,
           );
         }
@@ -277,27 +278,62 @@ See $workspacesDocUrl for more information.
       return p.join(root, path);
     }
 
-    return Ignore.listFiles(
+    /// Throws if [path] is a link that cannot resolve.
+    ///
+    /// Circular links will fail to resolve at some depth defined by the os.
+    void verifyLink(String path) {
+      final link = Link(path);
+      if (link.existsSync()) {
+        try {
+          link.resolveSymbolicLinksSync();
+        } on FileSystemException catch (e) {
+          if (!link.existsSync()) {
+            return;
+          }
+          throw DataException(
+            'Could not resolve symbolic link $path. $e',
+          );
+        }
+      }
+    }
+
+    /// We check each directory that it doesn't symlink-resolve to the
+    /// symlink-resolution of any parent directory of itself. This avoids
+    /// cycles.
+    ///
+    /// Cache the symlink resolutions here.
+    final symlinkResolvedDirs = <String, String>{};
+    String resolveDirSymlinks(String path) {
+      return symlinkResolvedDirs[path] ??=
+          Directory(path).resolveSymbolicLinksSync();
+    }
+
+    final result = Ignore.listFiles(
       beneath: beneath,
       listDir: (dir) {
-        var contents = Directory(resolve(dir)).listSync();
+        final resolvedDir = p.normalize(resolve(dir));
+        verifyLink(resolvedDir);
+
+        {
+          final canonicalized = p.canonicalize(resolvedDir);
+          final symlinkResolvedDir = resolveDirSymlinks(canonicalized);
+          for (final parent in parentDirs(p.dirname(canonicalized))) {
+            final symlinkResolvedParent = resolveDirSymlinks(parent);
+            if (p.equals(symlinkResolvedDir, symlinkResolvedParent)) {
+              dataError('''
+Pub does not support symlink cycles.
+
+$symlinkResolvedDir => ${p.canonicalize(symlinkResolvedParent)}
+''');
+            }
+          }
+        }
+        var contents = Directory(resolvedDir).listSync(followLinks: false);
+
         if (!recursive) {
           contents = contents.where((entity) => entity is! Directory).toList();
         }
         return contents.map((entity) {
-          if (linkExists(entity.path)) {
-            final target = Link(entity.path).targetSync();
-            if (dirExists(entity.path)) {
-              throw DataException(
-                '''Pub does not support publishing packages with directory symlinks: `${entity.path}`.''',
-              );
-            }
-            if (!fileExists(entity.path)) {
-              throw DataException(
-                '''Pub does not support publishing packages with non-resolving symlink: `${entity.path}` => `$target`.''',
-              );
-            }
-          }
           final relative = p.relative(entity.path, from: root);
           if (Platform.isWindows) {
             return p.posix.joinAll(p.split(relative));
@@ -322,7 +358,8 @@ See $workspacesDocUrl for more information.
                 rules,
                 onInvalidPattern: (pattern, exception) {
                   log.warning(
-                    '$ignoreFile had invalid pattern $pattern. ${exception.message}',
+                    '$ignoreFile had invalid pattern $pattern. '
+                    '${exception.message}',
                   );
                 },
                 // Ignore case on macOS and Windows, because `git clone` and
@@ -365,6 +402,10 @@ See $workspacesDocUrl for more information.
       isDir: (dir) => dirExists(resolve(dir)),
       includeDirs: includeDirs,
     ).map(resolve).toList();
+    for (final f in result) {
+      verifyLink(f);
+    }
+    return result;
   }
 
   /// Applies [transform] to each package in the workspace and returns a derived
@@ -394,9 +435,12 @@ See $workspacesDocUrl for more information.
 /// * If a package name occurs twice.
 /// * If two packages in the workspace override the same package name.
 /// * A workspace package is overridden.
+/// * A pubspec not included in the workspace exists in a directory
+///   between the root and a workspace package.
 void validateWorkspace(Package root) {
   if (root.workspaceChildren.isEmpty) return;
 
+  /// Maps the `p.canonicalize`d dir of each workspace-child to its parent.
   final includedFrom = <String, String>{};
   final stack = [root];
 
@@ -405,12 +449,20 @@ void validateWorkspace(Package root) {
     for (final child in current.workspaceChildren) {
       final previous = includedFrom[p.canonicalize(child.dir)];
       if (previous != null) {
+        if (previous == current.dir) {
+          fail(
+            '''
+Packages can only be included in the workspace once.
+
+`${p.join(child.dir, 'pubspec.yaml')}` is included twice into the workspace of `${p.join(current.dir, 'pubspec.yaml')}`''',
+          );
+        }
         fail('''
 Packages can only be included in the workspace once.
 
 `${p.join(child.dir, 'pubspec.yaml')}` is included in the workspace, both from:
 * `${p.join(current.dir, 'pubspec.yaml')}` and
-* ${p.join(previous, 'pubspec.yaml')}.''');
+* `${p.join(previous, 'pubspec.yaml')}`.''');
       }
       includedFrom[p.canonicalize(child.dir)] = current.dir;
     }
@@ -451,6 +503,43 @@ Consider removing one of the overrides.
 Cannot override workspace packages.
 
 Package `$override` at `${overriddenWorkspacePackage.presentationDir}` is overridden in `${package.pubspecPath}`.
+''');
+      }
+    }
+  }
+
+  // Check for pubspec.yaml files between the root and any workspace package.
+  final visited = <String>{
+    // By adding this to visited we will never go above the workspaceRoot.dir.
+    p.canonicalize(root.dir),
+  };
+  for (final package in root.transitiveWorkspace
+      // We don't want to look at the roots parents. The first package is always
+      // the root, so skip that.
+      .skip(1)) {
+    // Run through all parent directories until we meet another workspace
+    // package.
+    for (final dir in parentDirs(package.dir).skip(1)) {
+      // Stop if we meet another package directory.
+      if (includedFrom.containsKey(p.canonicalize(dir))) {
+        break;
+      }
+      if (!visited.add(p.canonicalize(dir))) {
+        // We have been here before.
+        break;
+      }
+      final pubspecCandidate = p.join(dir, 'pubspec.yaml');
+      if (fileExists(pubspecCandidate)) {
+        fail('''
+The file `$pubspecCandidate` is located in a directory between the workspace root at
+`${root.dir}` and a workspace package at `${package.dir}`. But is not a member of the
+workspace.
+
+This blocks the resolution of the package at `${package.dir}`.
+
+Consider removing it.
+
+See https://dart.dev/go/workspaces-stray-files for details.
 ''');
       }
     }

@@ -132,8 +132,9 @@ class Entrypoint {
       }
     }
     if (pubspecsMet.isEmpty) {
+      final dir = p.normalize(p.absolute(workingDir));
       throw FileException(
-        'Found no `pubspec.yaml` file in `${p.normalize(p.absolute(workingDir))}` or parent directories',
+        'Found no `pubspec.yaml` file in `$dir` or parent directories',
         p.join(workingDir, 'pubspec.yaml'),
       );
     } else {
@@ -216,8 +217,8 @@ See $workspacesDocUrl for more information.''',
           e.message,
           e.span,
           explanation: 'Failed parsing lock file:',
-          hint:
-              'Consider deleting the file and running `$topLevelProgram pub get` to recreate it.',
+          hint: 'Consider deleting the file and running '
+              '`$topLevelProgram pub get` to recreate it.',
         );
       }
     }
@@ -244,7 +245,8 @@ See $workspacesDocUrl for more information.''',
       packageConfigRaw = readTextFile(packageConfigPath);
     } on FileException {
       dataError(
-        'The "$packageConfigPath" file does not exist, please run "$topLevelProgram pub get".',
+        'The "$packageConfigPath" file does not exist, '
+        'please run "$topLevelProgram pub get".',
       );
     }
     late PackageConfig result;
@@ -275,8 +277,8 @@ See $workspacesDocUrl for more information.''',
 
   Future<PackageGraph> _createPackageGraph() async {
     // TODO(sigurdm): consider having [ensureUptoDate] and [acquireDependencies]
-    // return the package-graph, such it by construction will always made from an
-    // up-to-date package-config.
+    // return the package-graph, such it by construction will always made from
+    // an up-to-date package-config.
     await ensureUpToDate(workspaceRoot.dir, cache: cache);
     final packages = {
       for (var packageEntry in packageConfig.nonInjectedPackages)
@@ -324,7 +326,7 @@ See $workspacesDocUrl for more information.''',
   /// An entrypoint for the workspace containing [workingDir]/
   ///
   /// If [checkInCache] is `true` (the default) an error will be thrown if
-  /// [rootDir] is located inside [cache.rootDir].
+  /// [workingDir] is located inside [cache]`.rootDir`.
 
   Entrypoint(
     this.workingDir,
@@ -483,7 +485,9 @@ See $workspacesDocUrl for more information.''',
       },
     );
 
-    return '${const JsonEncoder.withIndent('  ').convert(packageConfig.toJson())}\n';
+    final jsonText =
+        const JsonEncoder.withIndent('  ').convert(packageConfig.toJson());
+    return '$jsonText\n';
   }
 
   /// Gets all dependencies of the [workspaceRoot] package.
@@ -504,14 +508,14 @@ See $workspacesDocUrl for more information.''',
   /// if [summaryOnly] is `true` only success or failure will be
   /// shown --- in case of failure, a reproduction command is shown.
   ///
-  /// Updates [lockFile] and [packageRoot] accordingly.
+  /// Updates [lockFile] and [packageGraph] accordingly.
   ///
   /// If [enforceLockfile] is true no changes to the current lockfile are
   /// allowed. Instead the existing lockfile is loaded, verified against
   /// pubspec.yaml and all dependencies downloaded.
   Future<void> acquireDependencies(
     SolveType type, {
-    Iterable<String>? unlock,
+    Iterable<String> unlock = const [],
     bool dryRun = false,
     bool precompile = false,
     bool summaryOnly = false,
@@ -543,7 +547,7 @@ Try running `$topLevelProgram pub get` to create `$lockFilePath`.''');
           cache,
           workspaceRoot,
           lockFile: lockFile,
-          unlock: unlock ?? [],
+          unlock: unlock,
         );
       });
     } on SolveFailure catch (e) {
@@ -553,7 +557,7 @@ Try running `$topLevelProgram pub get` to create `$lockFilePath`.''');
           this,
           type,
           e.incompatibility,
-          unlock ?? [],
+          unlock,
           cache,
         ),
       );
@@ -562,7 +566,6 @@ Try running `$topLevelProgram pub get` to create `$lockFilePath`.''');
     // We have to download files also with --dry-run to ensure we know the
     // archive hashes for downloaded files.
     final newLockFile = await result.downloadCachedPackages(cache);
-
     final report = SolveReport(
       type,
       workspaceRoot.presentationDir,
@@ -578,7 +581,7 @@ Try running `$topLevelProgram pub get` to create `$lockFilePath`.''');
     );
 
     await report.show(summary: true);
-    if (enforceLockfile && !_lockfilesMatch(lockFile, newLockFile)) {
+    if (enforceLockfile && !lockFile.samePackageIds(newLockFile)) {
       dataError('''
 Unable to satisfy `${workspaceRoot.pubspecPath}` using `$lockFilePath`$suffix.
 
@@ -659,7 +662,7 @@ To update `$lockFilePath` run `$topLevelProgram pub get`$suffix without
     });
   }
 
-  /// Precompiles executable .dart file at [path] to a snapshot.
+  /// Precompiles [executable] to a snapshot.
   ///
   /// The [additionalSources], if provided, instruct the compiler to include
   /// additional source files into compilation even if they are not referenced
@@ -674,13 +677,11 @@ To update `$lockFilePath` run `$topLevelProgram pub get`$suffix without
   }) async {
     await log.progress('Building package executable', () async {
       ensureDir(p.dirname(pathOfSnapshot(executable)));
-      return waitAndPrintErrors([
-        _precompileExecutable(
-          executable,
-          additionalSources: additionalSources,
-          nativeAssets: nativeAssets,
-        ),
-      ]);
+      return await _precompileExecutable(
+        executable,
+        additionalSources: additionalSources,
+        nativeAssets: nativeAssets,
+      );
     });
   }
 
@@ -702,13 +703,11 @@ To update `$lockFilePath` run `$topLevelProgram pub get`$suffix without
     cache.maintainCache();
   }
 
-  /// The location of the snapshot of the dart program at [path] in [package]
+  /// The location of the snapshot of the dart program at [executable]
   /// will be stored here.
   ///
   /// We use the sdk version to make sure we don't run snapshots from a
   /// different sdk.
-  ///
-  /// [path] must be relative.
   String pathOfSnapshot(Executable executable) {
     return isCachedGlobal
         ? executable.pathOfGlobalSnapshot(workspaceRoot.dir)
@@ -732,8 +731,8 @@ To update `$lockFilePath` run `$topLevelProgram pub get`$suffix without
     }
   }
 
-  /// Does a fast-pass check to see if the resolution is up-to-date
-  /// ([_isUpToDate]). If not, run a resolution with `pub get` semantics.
+  /// Does a fast-pass check to see if the resolution is up-to-date. If not, run
+  /// a resolution with `pub get` semantics.
   ///
   /// If [summaryOnly] is `true` (the default) only a short summary is shown of
   /// the solve.
@@ -756,8 +755,8 @@ To update `$lockFilePath` run `$topLevelProgram pub get`$suffix without
     /// Whether the lockfile is out of date with respect to the dependencies'
     /// pubspecs.
     ///
-    /// If any mutable pubspec contains dependencies that are not in the lockfile
-    /// or that don't match what's in there, this will return `false`.
+    /// If any mutable pubspec contains dependencies that are not in the
+    /// lockfile or that don't match what's in there, this will return `false`.
     bool isLockFileUpToDate(
       LockFile lockFile,
       Package root, {
@@ -786,7 +785,8 @@ To update `$lockFilePath` run `$topLevelProgram pub get`$suffix without
         if (sdkVersion != null) {
           if (!constraint.effectiveConstraint.allows(sdkVersion)) {
             log.fine(
-              '`$lockFilePath` requires $sdkName $constraint. Current version is $sdkVersion',
+              '`$lockFilePath` requires $sdkName $constraint. '
+              'Current version is $sdkVersion',
             );
             return false;
           }
@@ -840,17 +840,17 @@ To update `$lockFilePath` run `$topLevelProgram pub get`$suffix without
     }) {
       /// Determines if [lockFile] agrees with the given [packagePathsMapping].
       ///
-      /// The [packagePathsMapping] is a mapping from package names to paths where
-      /// the packages are located. (The library is located under
-      /// `lib/` relative to the path given).
+      /// The [packagePathsMapping] is a mapping from package names to paths
+      /// where the packages are located. (The library is located under `lib/`
+      /// relative to the path given).
       bool isPackagePathsMappingUpToDateWithLockfile(
         Map<String, String> packagePathsMapping, {
         required String lockFilePath,
         required String packageConfigPath,
       }) {
-        // Check that [packagePathsMapping] does not contain more packages than what
-        // is required. This could lead to import statements working, when they are
-        // not supposed to work.
+        // Check that [packagePathsMapping] does not contain more packages than
+        // what is required. This could lead to import statements working, when
+        // they are not supposed to work.
         final hasExtraMappings = !packagePathsMapping.keys.every((packageName) {
           return packageName == root.name ||
               lockFile.packages.containsKey(packageName);
@@ -864,8 +864,8 @@ To update `$lockFilePath` run `$topLevelProgram pub get`$suffix without
         return lockFile.packages.values.every((lockFileId) {
           // It's very unlikely that the lockfile is invalid here, but it's not
           // impossible—for example, the user may have a very old application
-          // package with a checked-in lockfile that's newer than the pubspec, but
-          // that contains SDK dependencies.
+          // package with a checked-in lockfile that's newer than the pubspec,
+          // but that contains SDK dependencies.
           if (lockFileId.source is UnknownSource) return false;
 
           final packagePath = packagePathsMapping[lockFileId.name];
@@ -885,8 +885,8 @@ To update `$lockFilePath` run `$topLevelProgram pub get`$suffix without
           }
 
           // For cached sources, make sure the directory exists and looks like a
-          // package. This is also done by [_arePackagesAvailable] but that may not
-          // be run if the lockfile is newer than the pubspec.
+          // package. This is also done by [_arePackagesAvailable] but that may
+          // not be run if the lockfile is newer than the pubspec.
           if (source is CachedSource && !dirExists(lockFilePackagePath) ||
               !fileExists(p.join(lockFilePackagePath, 'pubspec.yaml'))) {
             return false;
@@ -903,7 +903,8 @@ To update `$lockFilePath` run `$topLevelProgram pub get`$suffix without
         // Pub always makes a packageUri of lib/
         if (pkg.packageUri == null || pkg.packageUri.toString() != 'lib/') {
           log.fine(
-            'The "$packageConfigPath" file is not recognized by this pub version.',
+            'The "$packageConfigPath" file '
+            'is not recognized by this pub version.',
           );
           return false;
         }
@@ -943,8 +944,8 @@ To update `$lockFilePath` run `$topLevelProgram pub get`$suffix without
         }
 
         try {
-          // Load `pubspec.yaml` and extract language version to compare with the
-          // language version from `package_config.json`.
+          // Load `pubspec.yaml` and extract language version to compare with
+          // the language version from `package_config.json`.
           final languageVersion = cache.load(id).pubspec.languageVersion;
           if (pkg.languageVersion != languageVersion) {
             final relativePubspecPath = p.join(
@@ -1028,7 +1029,8 @@ To update `$lockFilePath` run `$topLevelProgram pub get`$suffix without
         final workspaceRefText = tryReadTextFile(potentialWorkspaceRefPath);
         if (workspaceRefText == null) {
           log.fine(
-            '`$potentialPubspacPath` exists without corresponding `$potentialPubspacPath` or `$potentialWorkspaceRefPath`.',
+            '`$potentialPubspacPath` exists without corresponding '
+            '`$potentialPubspacPath` or `$potentialWorkspaceRefPath`.',
           );
           return null;
         } else {
@@ -1050,7 +1052,8 @@ To update `$lockFilePath` run `$topLevelProgram pub get`$suffix without
               packageConfigStat = tryStatFile(potentialPackageConfigPath2);
               if (packageConfigStat == null) {
                 log.fine(
-                  '`$potentialWorkspaceRefPath` points to non-existing `$potentialPackageConfigPath2`',
+                  '`$potentialWorkspaceRefPath` points to non-existing '
+                  '`$potentialPackageConfigPath2`',
                 );
                 return null;
               } else {
@@ -1070,7 +1073,8 @@ To update `$lockFilePath` run `$topLevelProgram pub get`$suffix without
               }
             } else {
               log.fine(
-                '`$potentialWorkspaceRefPath` is missing "workspaceRoot" property',
+                '`$potentialWorkspaceRefPath` '
+                'is missing "workspaceRoot" property',
               );
               return null;
             }
@@ -1128,8 +1132,11 @@ To update `$lockFilePath` run `$topLevelProgram pub get`$suffix without
       // If the pub cache was moved we should have a new resolution.
       final rootCacheUrl = p.toUri(p.absolute(cache.rootDir)).toString();
       if (packageConfig.additionalProperties['pubCache'] != rootCacheUrl) {
+        final previousPubCachePath =
+            packageConfig.additionalProperties['pubCache'];
         log.fine(
-          'The pub cache has moved from ${packageConfig.additionalProperties['pubCache']} to $rootCacheUrl since last invocation.',
+          'The pub cache has moved from $previousPubCachePath to $rootCacheUrl '
+          'since last invocation.',
         );
         return null;
       }
@@ -1154,7 +1161,8 @@ To update `$lockFilePath` run `$topLevelProgram pub get`$suffix without
             rootDir,
             '.dart_tool',
             package.rootUri
-                // Important to use `toFilePath()` here rather than `path`, as it handles Url-decoding.
+                // Important to use `toFilePath()` here rather than `path`, as
+                // it handles Url-decoding.
                 .toFilePath(),
             'pubspec.yaml',
           ),
@@ -1324,36 +1332,48 @@ See https://dart.dev/go/sdk-constraint
   bool get _summaryOnlyEnvironment =>
       (Platform.environment['PUB_SUMMARY_ONLY'] ?? '0') != '0';
 
-  /// Returns true if the packages in [newLockFile] and [previousLockFile] are
-  /// all the same, meaning:
-  ///  * same set of package-names
-  ///  * for each package
-  ///    * same version number
-  ///    * same resolved description (same content-hash, git hash, path)
-  bool _lockfilesMatch(LockFile previousLockFile, LockFile newLockFile) {
-    if (previousLockFile.packages.length != newLockFile.packages.length) {
-      return false;
-    }
-    for (final package in newLockFile.packages.values) {
-      final oldPackage = previousLockFile.packages[package.name];
-      if (oldPackage == null) return false; // Package added to resolution.
-      if (oldPackage.version != package.version) return false;
-      if (oldPackage.description != package.description) return false;
-    }
-    return true;
-  }
-
   /// Remove any `pubspec.lock` or `.dart_tool/package_config.json` files in
   /// workspace packages that are not the root package.
+  ///
+  /// Also remove from directories between the workspace package and the
+  /// workspace root, to prevent stray package configs from shadowing the shared
+  /// workspace package config.
   ///
   /// This is to avoid surprises if a package is turned into a workspace member
   /// but still has an old package config or lockfile.
   void _removeStrayLockAndConfigFiles() {
+    final visited = <String>{
+      // By adding this to visited we will never go above the workspaceRoot.dir.
+      p.canonicalize(workspaceRoot.dir),
+    };
+    var deletedAny = false;
     for (final package in workspaceRoot.transitiveWorkspace) {
       if (package.pubspec.resolution == Resolution.workspace) {
-        deleteEntry(p.join(package.dir, 'pubspec.lock'));
-        deleteEntry(p.join(package.dir, '.dart_tool', 'package_config.json'));
+        for (final dir in parentDirs(package.dir)) {
+          if (!visited.add(p.canonicalize(dir))) {
+            // No reason to delete from the same directory twice.
+            break;
+          }
+          void deleteIfPresent(String path, String type) {
+            if (fileExists(path)) {
+              log.warning('Deleting old $type: `$path`.');
+              deleteEntry(path);
+              deletedAny = true;
+            }
+          }
+
+          deleteIfPresent(p.join(dir, 'pubspec.lock'), 'lock-file');
+          deleteIfPresent(
+            p.join(dir, '.dart_tool', 'package_config.json'),
+            'package config',
+          );
+        }
       }
+    }
+    if (deletedAny) {
+      log.warning(
+        'See https://dart.dev/go/workspaces-stray-files for details.',
+      );
     }
   }
 
@@ -1378,7 +1398,12 @@ See https://dart.dev/go/sdk-constraint
 
     final toTighten = <(Package, PackageRange)>[];
 
+    // Keep track of the versions of workspace packages - these are not included
+    // in the lockfile.
+    final workspaceVersions = <String, Version>{};
+
     for (final package in workspaceRoot.transitiveWorkspace) {
+      workspaceVersions[package.name] = package.version;
       if (packagesToUpgrade.isEmpty) {
         for (final range in [
           ...package.dependencies.values,
@@ -1400,10 +1425,12 @@ See https://dart.dev/go/sdk-constraint
     for (final (package, range) in toTighten) {
       final changesForPackage = result[package] ??= {};
       final constraint = (changesForPackage[range] ?? range).constraint;
+
       final resolvedVersion =
           (packageVersions?.firstWhere((p) => p.name == range.name) ??
-                  lockFile.packages[range.name])!
-              .version;
+                      lockFile.packages[range.name])
+                  ?.version ??
+              workspaceVersions[range.name]!;
       if (range.source is HostedSource && constraint.isAny) {
         changesForPackage[range] = range
             .toRef()
@@ -1425,8 +1452,9 @@ See https://dart.dev/go/sdk-constraint
     return result;
   }
 
-  /// Unless [dryRun], loads `pubspec.yaml` of each [package] in [changeSet] and applies the
-  /// changes to its (dev)-dependencies using yaml_edit to preserve textual structure.
+  /// Unless [dryRun], loads `pubspec.yaml` of each [Package] in [changeSet] and
+  /// applies the changes to its (dev)-dependencies using yaml_edit to preserve
+  /// textual structure.
   ///
   /// Outputs a summary of changes done or would have been done if not [dryRun].
   void applyChanges(ChangeSet changeSet, bool dryRun) {
@@ -1465,8 +1493,10 @@ See https://dart.dev/go/sdk-constraint
         log.message('\nNo changes $wouldBe pubspec.yaml!');
       } else {
         final changed = dryRun ? 'Would change' : 'Changed';
+        final constraints =
+            pluralize('constraint', changesToWorkspaceRoot.length);
         log.message('\n$changed ${changesToWorkspaceRoot.length} '
-            '${pluralize('constraint', changesToWorkspaceRoot.length)} in pubspec.yaml:');
+            '$constraints in pubspec.yaml:');
         changesToWorkspaceRoot.forEach((from, to) {
           log.message('  ${from.name}: ${from.constraint} -> ${to.constraint}');
         });
@@ -1480,8 +1510,9 @@ See https://dart.dev/go/sdk-constraint
         final changesToPackage = changeSet[package] ?? {};
         if (changesToPackage.isEmpty) continue;
         final changed = dryRun ? 'Would change' : 'Changed';
+        final constraints = pluralize('constraint', changesToPackage.length);
         log.message('\n$changed ${changesToPackage.length} '
-            '${pluralize('constraint', changesToPackage.length)} in ${package.pubspecPath}:');
+            '$constraints in ${package.pubspecPath}:');
         changesToPackage.forEach((from, to) {
           log.message('  ${from.name}: ${from.constraint} -> ${to.constraint}');
         });

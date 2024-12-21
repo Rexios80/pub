@@ -76,12 +76,10 @@ String packageConfigFilePath =
     p.join(appPath, '.dart_tool', 'package_config.json');
 
 /// The entry from the `.dart_tool/package_config.json` file for [packageName].
-Map<String, dynamic> packageSpec(String packageName) => json
-    .decode(File(d.path(packageConfigFilePath)).readAsStringSync())['packages']
-    .firstWhere(
-      (dynamic e) => e['name'] == packageName,
-      orElse: () => null,
-    ) as Map<String, dynamic>;
+Map<String, dynamic> packageSpec(String packageName) => dig(
+      json.decode(File(d.path(packageConfigFilePath)).readAsStringSync()),
+      ['packages', ('name', packageName)],
+    );
 
 /// The suffix appended to a built snapshot.
 const versionSuffix = testVersion;
@@ -473,7 +471,8 @@ Map<String, String> getPubTestEnvironment([String? tokenEndpoint]) => {
 final String _pubRoot = (() {
   if (!fileExists(p.join('bin', 'pub.dart'))) {
     throw StateError(
-      "Current working directory (${p.current} is not pub's root. Run tests from pub's root.",
+      "Current working directory (${p.current} is not pub's root. "
+      "Run tests from pub's root.",
     );
   }
   return p.current;
@@ -679,8 +678,8 @@ void ensureGit() {
 
 /// Creates a lock file for [package] without running `pub get`.
 ///
-/// [dependenciesInSandBox] is a list of path dependencies to be found in the sandbox
-/// directory.
+/// [dependenciesInSandBox] is a list of path dependencies to be found in the
+/// sandbox directory.
 ///
 /// [hosted] is a list of package names to version strings for dependencies on
 /// hosted packages.
@@ -702,7 +701,7 @@ Future<void> createLockFile(
   ]).create();
 }
 
-/// Creates a lock file for [sources] without running `pub get`.
+/// Creates a lock file without running `pub get`.
 ///
 /// [sandbox] is a list of path dependencies to be found in the sandbox
 /// directory.
@@ -885,9 +884,9 @@ void _validateOutputJson(
 
   // Remove dart2js's timing logs, which would otherwise cause tests to fail
   // flakily when compilation takes a long time.
-  actual['log']?.removeWhere(
+  (actual['log'] as List?)?.removeWhere(
     (dynamic entry) =>
-        entry['level'] == 'Fine' &&
+        (entry as Map)['level'] == 'Fine' &&
         (entry['message'] as String).startsWith('Not yet complete after'),
   );
 
@@ -979,8 +978,10 @@ Future<void> runPubIntoBuffer(
   //       .join('\n'));
   // }
   final pipe = stdin == null ? '' : ' echo ${escapeShellArgument(stdin)} |';
+  final joinedArgs =
+      args.map(filterUnstableText).map(escapeShellArgument).join(' ');
   buffer.writeln(
-    '\$$pipe pub ${args.map(filterUnstableText).map(escapeShellArgument).join(' ')}',
+    '\$$pipe pub $joinedArgs',
   );
   for (final line in await process.stdout.rest.toList()) {
     buffer.writeln(filterUnstableText(line));
@@ -1019,7 +1020,7 @@ Future<PackageServer> startPackageServer() async {
   return server;
 }
 
-/// Create temporary folder 'bin/' containing a 'git' script in [sandbox]
+/// Create temporary folder 'bin/' containing a 'git' script in [d.sandbox]
 /// By adding the bin/ folder to the search `$PATH` we can prevent `pub` from
 /// detecting the installed 'git' binary and we can test that it prints
 /// a useful error message.
@@ -1114,4 +1115,38 @@ Stream<List<int>> _replaceOs(Stream<List<int>> stream) async* {
   final result = bytesBuilder.toBytes();
   result[9] = 0;
   yield result;
+}
+
+/// Utility for indexing json data structures.
+///
+/// Each element of [path] should be a `String`, `int` or `(String, String)`.
+///
+/// For each element `key` of [path], recurse into [json].
+///
+/// If the `key` is a String, the next json structure should be a Map, and have
+/// `key` as a property. Recurse into that property.
+///
+/// If `key` is an `int`, the next json structure must be a List, with that
+/// index. Recurse into that index.
+///
+/// If `key` in a `(String k, String v)` the next json structure must be a List
+/// of maps, one of them having the property `k` with value `v`, recurse into
+/// that map.
+///
+/// Cast the result as a [T].
+T dig<T>(dynamic json, List<dynamic> path) {
+  for (var i = 0; i < path.length; i++) {
+    switch (path[i]) {
+      case final String key:
+        json = (json as Map)[key];
+      case final int key:
+        json = (json as List)[key];
+      case (final String key, final String value):
+        json = (json as List)
+            .firstWhere((element) => (element as Map)[key] == value);
+      case final key:
+        throw ArgumentError('Bad key $key in', 'path');
+    }
+  }
+  return json as T;
 }

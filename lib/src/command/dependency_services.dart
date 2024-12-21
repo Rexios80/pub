@@ -38,8 +38,8 @@ class DependencyServicesReportCommand extends PubCommand {
   @override
   String get name => 'report';
   @override
-  String get description =>
-      'Output a machine-digestible report of the upgrade options for each dependency.';
+  String get description => 'Output a machine-digestible '
+      'report of the upgrade options for each dependency.';
   @override
   String get argumentsDescription => '[options]';
 
@@ -293,7 +293,17 @@ class DependencyServicesApplyCommand extends PubCommand {
   Future<void> runProtected() async {
     final toApply = <_PackageVersion>[];
     final input = json.decode(await utf8.decodeStream(stdin));
-    for (final change in input['dependencyChanges'] as Iterable) {
+    if (input is! Map<String, dynamic>) {
+      fail('Bad input, must be json map');
+    }
+    final dependencyChanges = input['dependencyChanges'];
+    if (dependencyChanges is! List) {
+      fail('Bad input. `dependencyChanges` must be a list');
+    }
+    for (final change in dependencyChanges) {
+      if (change is! Map<String, dynamic>) {
+        fail('Bad input. Each element of `dependencyChanges` must be a map.');
+      }
       toApply.add(
         _PackageVersion(
           change['name'] as String,
@@ -315,30 +325,37 @@ class DependencyServicesApplyCommand extends PubCommand {
         final targetVersion = p.version;
         late final section = pubspec.dependencies[targetPackage] != null
             ? 'dependencies'
-            : 'dev_dependencies';
-        if (targetConstraint != null) {
-          final packageConfig =
-              pubspecEditor.parseAt([section, targetPackage]).value;
-          if (packageConfig == null || packageConfig is String) {
-            pubspecEditor
-                .update([section, targetPackage], targetConstraint.toString());
-          } else if (packageConfig is Map) {
-            pubspecEditor.update(
-              [section, targetPackage, 'version'],
-              targetConstraint.toString(),
-            );
-          } else {
-            fail(
-              'The dependency $targetPackage does not have a map or string as a description',
-            );
-          }
-        } else if (targetVersion != null) {
-          final constraint = _constraintOf(pubspec, targetPackage);
-          if (constraint != null && !constraint.allows(targetVersion)) {
-            pubspecEditor.update(
-              [section, targetPackage],
-              VersionConstraint.compatibleWith(targetVersion).toString(),
-            );
+            : pubspec.devDependencies[targetPackage] != null
+                ? 'dev_dependencies'
+                : null;
+        if (section != null) {
+          if (targetConstraint != null) {
+            final packageConfig =
+                pubspecEditor.parseAt([section, targetPackage]).value;
+            if (packageConfig == null || packageConfig is String) {
+              pubspecEditor.update(
+                [section, targetPackage],
+                targetConstraint.toString(),
+              );
+            } else if (packageConfig is Map) {
+              pubspecEditor.update(
+                [section, targetPackage, 'version'],
+                targetConstraint.toString(),
+              );
+            } else {
+              fail(
+                'The dependency $targetPackage does not have a '
+                'map or string as a description',
+              );
+            }
+          } else if (targetVersion != null) {
+            final constraint = _constraintOf(pubspec, targetPackage);
+            if (constraint != null && !constraint.allows(targetVersion)) {
+              pubspecEditor.update(
+                [section, targetPackage],
+                VersionConstraint.compatibleWith(targetVersion).toString(),
+              );
+            }
           }
         }
         updatedPubspecs[package.dir] = pubspecEditor;
@@ -348,6 +365,7 @@ class DependencyServicesApplyCommand extends PubCommand {
         ? readTextFile(entrypoint.lockFilePath)
         : null;
     final lockFileYaml = lockFile == null ? null : loadYaml(lockFile);
+
     final lockFileEditor = lockFile == null ? null : YamlEditor(lockFile);
     final hasContentHashes = _lockFileHasContentHashes(lockFileYaml);
     final usesPubDev = _lockFileUsesPubDev(lockFileYaml);
@@ -357,6 +375,9 @@ class DependencyServicesApplyCommand extends PubCommand {
       final targetRevision = p.gitRevision;
 
       if (lockFileEditor != null) {
+        if (lockFileYaml is! Map) {
+          fail('Malformed pubspec.lock. Must be a map');
+        }
         if (targetVersion != null &&
             (lockFileYaml['packages'] as Map).containsKey(targetPackage)) {
           lockFileEditor.update(
@@ -389,7 +410,8 @@ class DependencyServicesApplyCommand extends PubCommand {
           final versions = await cache.getVersions(updatedRef);
           if (versions.isEmpty) {
             dataError(
-              'Found no versions of $targetPackage with git revision `$targetRevision`.',
+              'Found no versions of $targetPackage '
+              'with git revision `$targetRevision`.',
             );
           }
           // GitSource can only return a single version.
@@ -407,7 +429,8 @@ class DependencyServicesApplyCommand extends PubCommand {
             targetRevision == null &&
             !(lockFileYaml['packages'] as Map).containsKey(targetPackage)) {
           dataError(
-            'Trying to remove non-existing transitive dependency $targetPackage.',
+            'Trying to remove non-existing '
+            'transitive dependency $targetPackage.',
           );
         }
       }
@@ -452,7 +475,8 @@ class DependencyServicesApplyCommand extends PubCommand {
             );
           }
         }
-        // Only if we originally had a lock-file we write the resulting lockfile back.
+        // Only if we originally had a lock-file we write the resulting lockfile
+        // back.
         if (updatedLockfile != null) {
           final updatedPackages = <PackageId>[];
           for (var package in solveResult.packages) {
@@ -575,7 +599,8 @@ Map<String, PackageRange>? _dependencySetOfPackage(
 
 /// Return a constraint compatible with [newVersion].
 ///
-/// By convention if the original constraint is pinned we return [newVersion]. Otherwise use [VersionConstraint.compatibleWith].
+/// By convention if the original constraint is pinned we return [newVersion].
+/// Otherwise use [VersionConstraint.compatibleWith].
 VersionConstraint _bumpConstraint(
   VersionConstraint original,
   Version newVersion,
@@ -594,9 +619,11 @@ VersionConstraint _bumpConstraint(
   );
 }
 
-/// Return a constraint compatible with [newVersion], but including [original] as well.
+/// Return a constraint compatible with [newVersion], but including [original]
+/// as well.
 ///
-/// By convention if the original constraint is pinned, we don't widen the constraint but return [newVersion] instead.
+/// By convention if the original constraint is pinned, we don't widen the
+/// constraint but return [newVersion] instead.
 VersionConstraint _widenConstraint(
   VersionConstraint original,
   Version newVersion,

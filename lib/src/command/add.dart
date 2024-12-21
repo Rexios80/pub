@@ -88,6 +88,8 @@ For example:
 
   @override
   String get docUrl => 'https://dart.dev/tools/pub/cmd/pub-add';
+  @override
+  bool get isOffline => argResults.flag('offline');
 
   AddCommand() {
     argParser.addFlag(
@@ -98,9 +100,12 @@ For example:
       hide: true,
     );
 
-    // Following options are hidden/deprecated in favor of the new syntax: [dev:]<package>[:descriptor] ...
-    // To avoid breaking changes we keep supporting them, but hide them from --help to discourage
-    // further use. Combining these with new syntax will fail.
+    // Following options are hidden/deprecated in favor of the new syntax:
+    // [dev:]<package>[:descriptor] ...
+    //
+    // To avoid breaking changes we keep supporting them, but hide them from
+    // --help to discourage further use. Combining these with new syntax will
+    // fail.
     argParser.addOption(
       'git-url',
       help: 'Git URL of the package',
@@ -229,7 +234,8 @@ Specify multiple sdk packages with descriptors.''');
       final resultPackage = solveResult.packages
           .firstWhere((packageId) => packageId.name == name);
 
-      /// Assert that [resultPackage] is within the original user's expectations.
+      /// Assert that [resultPackage] is within the original user's
+      /// expectations.
       final constraint = update.constraint;
       if (constraint != null && !constraint.allows(resultPackage.version)) {
         final dependencyOverrides = resolutionPubspec.dependencyOverrides;
@@ -333,7 +339,8 @@ Specify multiple sdk packages with descriptors.''');
     } else {
       if (dependencyNames.contains(name)) {
         log.message(
-          '"$name" is already in "dependencies". Will try to update the constraint.',
+          '"$name" is already in "dependencies". '
+          'Will try to update the constraint.',
         );
         dependencies.removeWhere((element) => element.name == name);
       }
@@ -369,8 +376,8 @@ Specify multiple sdk packages with descriptors.''');
     r'(?::(?<descriptor>.*))?$',
   );
 
-  /// Split [arg] on ':' and interpret it with the flags in [argResult] either as
-  /// an old-style or a new-style descriptor to produce a PackageRef].
+  /// Split [arg] on ':' and interpret it with the flags in [argResults] either
+  /// as an old-style or a new-style descriptor to produce a PackageRef].
   _ParseResult _parsePackage(String arg, ArgResults argResults) {
     var isDev = argResults.flag('dev');
     var isOverride = false;
@@ -441,7 +448,8 @@ Specify multiple sdk packages with descriptors.''');
   /// description is issued.
   ///
   /// Examples:
-  /// ```
+  ///
+  /// ```none
   /// retry
   /// retry:2.0.0
   /// retry:^2.0.0
@@ -503,7 +511,8 @@ Specify multiple sdk packages with descriptors.''');
       }
       if (couldParseAsNewStyle) {
         usageException(
-          '--dev, --path, --sdk, --git-url, --git-path and --git-ref cannot be combined with a descriptor.',
+          '--dev, --path, --sdk, --git-url, --git-path and --git-ref '
+          'cannot be combined with a descriptor.',
         );
       } else {
         usageException('Invalid version constraint: ${e.message}');
@@ -557,9 +566,9 @@ Specify multiple sdk packages with descriptors.''');
     return _PartialParseResult(ref, constraint);
   }
 
-  /// Parse [package] to return the corresponding [_ParseResult].
+  /// Parse [packageName] to return the corresponding [_ParseResult].
   ///
-  /// [package] must be written in the format
+  /// [packageName] must be written in the format
   /// `<package-name>[:descriptor>]`, where quotations should be used if
   /// necessary.
   ///
@@ -571,7 +580,8 @@ Specify multiple sdk packages with descriptors.''');
   ///
   ///
   /// Examples:
-  /// ```
+  ///
+  /// ```none
   /// retry
   /// retry:2.0.0
   /// dev:retry:^2.0.0
@@ -585,20 +595,20 @@ Specify multiple sdk packages with descriptors.''');
   /// 'retry:{"hosted":"mypub.dev"}'
   /// ```
   ///
-  /// The --path --sdk and --git-<option> arguments cannot be combined with a
-  /// non-string descriptor.
+  /// The `--path`, `--sdk`, and `--git-<option>` arguments can't be
+  /// combined with a non-string descriptor.
   ///
   /// If a version constraint is provided when the `--path` or any of the
-  /// `--git-<option>` options are used, a [PackageParseError] will be thrown.
+  /// `--git-<option>` options are used, a [UsageException] will be thrown.
   ///
   /// Packages must either be a git, hosted, sdk, or path package. Mixing of
-  /// options is not allowed and will cause a [PackageParseError] to be thrown.
+  /// options is not allowed and will cause a [UsageException] to be thrown.
   ///
   /// If any of the other git options are defined when `--git-url` is not
   /// defined, an error will be thrown.
   ///
-  /// Returns a `ref` of `null` if the descriptor did not specify a source.
-  /// Then the source will be determined by the old-style arguments.
+  /// Returns a `ref` of `null` if the descriptor did not specify a source. Then
+  /// the source will be determined by the old-style arguments.
   _PartialParseResult _parseDescriptorNewStyle(
     String packageName,
     String? descriptor,
@@ -630,7 +640,8 @@ Specify multiple sdk packages with descriptors.''');
               },
             },
             cache.sources,
-            // Resolve relative paths relative to current, not where the pubspec.yaml is.
+            // Resolve relative paths relative to current, not where the
+            // pubspec.yaml is.
             containingDescription: RootDescription(p.current),
           );
         } on FormatException catch (e) {
@@ -717,7 +728,8 @@ Specify multiple sdk packages with descriptors.''');
       }
 
       /// Remove the package from dev_dependencies if we are adding it to
-      /// dependencies. Refer to [_addPackageToPubspec] for additional discussion.
+      /// dependencies. Refer to [_addPackageToPubspec] for additional
+      /// discussion.
       if (!update.isDev && !update.isOverride) {
         final devDependenciesNode = yamlEditor
             .parseAt(['dev_dependencies'], orElse: () => YamlScalar.wrap(null));

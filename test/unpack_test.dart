@@ -21,15 +21,16 @@ void main() {
     await runPub(
       args: ['unpack', 'foo:1:2:3'],
       error: contains(
-        'Error on line 1, column 1 of descriptor: Invalid version constraint: Could not parse version "1:2:3". Unknown text at "1:2:3".',
+        'Error on line 1, column 1 of descriptor: Invalid version constraint: '
+        'Could not parse version "1:2:3". Unknown text at "1:2:3".',
       ),
       exitCode: DATA,
     );
 
     await runPub(
       args: ['unpack', 'foo:1.0'],
-      error:
-          'Error on line 1, column 1 of descriptor: A dependency specification must be a string or a mapping.',
+      error: 'Error on line 1, column 1 of descriptor: '
+          'A dependency specification must be a string or a mapping.',
       exitCode: DATA,
     );
 
@@ -38,8 +39,8 @@ void main() {
     );
     await runPub(
       args: ['unpack', 'foo'],
-      error:
-          'Target directory `.${s}foo-1.2.3` already exists. Use --force to overwrite.',
+      error: 'Target directory `.${s}foo-1.2.3` already exists. '
+          'Use --force to overwrite.',
       exitCode: 1,
     );
     await runPub(args: ['unpack', 'foo', '--force']);
@@ -123,5 +124,45 @@ Resolving dependencies in `../foo-1.2.3-pre`...
       args: ['unpack', 'foo:{"hosted":"${server.url}", "version":"1.0.0"}'],
       output: contains('Downloading foo 1.0.0 to `.${s}foo-1.0.0`...'),
     );
+  });
+
+  test('unpacks and resolve workspace project', () async {
+    await d.dir(appPath).create();
+
+    final server = await servePackages();
+    server.serve('bar', '1.0.0');
+    server.serve(
+      'foo',
+      '1.0.0',
+      pubspec: {
+        'environment': {'sdk': '^3.5.0'},
+        'resolution': 'workspace',
+        'workspace': ['example'],
+      },
+      contents: [
+        d.dir('example', [
+          d.libPubspec(
+            'example',
+            '1.0.0',
+            sdk: '^3.5.0',
+            deps: {'foo': null, 'bar': '^1.0.0'},
+            extras: {'resolution': 'workspace'},
+          ),
+        ]),
+      ],
+    );
+    await runPub(
+      args: ['unpack', 'foo:1.0.0'],
+      output: allOf(
+        contains('Downloading foo 1.0.0 to `.${s}foo-1.0.0`...'),
+        contains(
+          '+ bar',
+        ),
+      ),
+      environment: {'_PUB_TEST_SDK_VERSION': '3.5.0'},
+    );
+    await d.dir(appPath, [
+      d.dir('foo-1.0.0', [d.file('pubspec_overrides.yaml', 'resolution:\n')]),
+    ]).validate();
   });
 }

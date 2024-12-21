@@ -7,9 +7,9 @@ import 'package:test/test.dart';
 import '../descriptor.dart' as d;
 import '../test_pub.dart';
 
-Future<void> expectValidation(Matcher error, int exitCode) async {
+Future<void> expectValidation(Matcher output, int exitCode) async {
   await runPub(
-    error: error,
+    output: output,
     args: ['publish', '--dry-run'],
     environment: {
       'FLUTTER_ROOT': fakeFlutterRoot.io.path,
@@ -30,8 +30,8 @@ Future<void> setup({
   await d.dir(appPath, [
     d.pubspec({
       'name': 'test_pkg',
-      'description':
-          'A just long enough description to fit the requirement of 60 characters',
+      'description': 'A just long enough description '
+          'to fit the requirement of 60 characters',
       'homepage': 'https://example.com/',
       'version': '1.0.0',
       'environment': {

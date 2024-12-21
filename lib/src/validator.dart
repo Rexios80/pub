@@ -25,6 +25,7 @@ import 'validator/executable.dart';
 import 'validator/file_case.dart';
 import 'validator/flutter_constraint.dart';
 import 'validator/flutter_plugin_format.dart';
+import 'validator/git_status.dart';
 import 'validator/gitignore.dart';
 import 'validator/leak_detection.dart';
 import 'validator/license.dart';
@@ -111,7 +112,8 @@ abstract class Validator {
         '  sdk: "${newSdkConstraint.asCompatibleWithIfPossible()}"');
   }
 
-  /// Returns whether [version1] and [version2] are pre-releases of the same version.
+  /// Returns whether [version1] and [version2] are pre-releases of the same
+  /// version.
   bool _isSamePreRelease(Version version1, Version version2) =>
       version1.isPreRelease &&
       version2.isPreRelease &&
@@ -142,6 +144,7 @@ abstract class Validator {
       FileCaseValidator(),
       AnalyzeValidator(),
       GitignoreValidator(),
+      GitStatusValidator(),
       PubspecValidator(),
       LicenseValidator(),
       NameValidator(),
@@ -182,48 +185,40 @@ abstract class Validator {
           .addAll([for (final validator in validators) ...validator.warnings]);
       errors.addAll([for (final validator in validators) ...validator.errors]);
 
-      if (errors.isNotEmpty) {
-        final s = errors.length > 1 ? 's' : '';
-        log.error('Package validation found the following error$s:');
-        for (var error in errors) {
-          log.error("* ${error.split('\n').join('\n  ')}");
-        }
-        log.error('');
-      }
+      String presentDiagnostics(List<String> diagnostics) => diagnostics
+          .map((diagnostic) => "* ${diagnostic.split('\n').join('\n  ')}\n")
+          .join('\n');
+      final sections = <String>[];
 
-      if (warnings.isNotEmpty) {
-        final s = warnings.length > 1 ? 's' : '';
-        log.warning(
-          'Package validation found the following potential issue$s:',
-        );
-        for (var warning in warnings) {
-          log.warning("* ${warning.split('\n').join('\n  ')}");
+      for (final (kind, diagnostics) in [
+        ('error', errors),
+        ('potential issue', warnings),
+        ('hint', hints),
+      ]) {
+        if (diagnostics.isNotEmpty) {
+          final s = diagnostics.length > 1 ? 's' : '';
+          final count = diagnostics.length > 1 ? '${diagnostics.length} ' : '';
+          sections.add(
+            'Package validation found the following $count$kind$s:\n'
+            '${presentDiagnostics(diagnostics)}',
+          );
         }
-        log.warning('');
       }
-
-      if (hints.isNotEmpty) {
-        final s = hints.length > 1 ? 's' : '';
-        log.warning(
-          'Package validation found the following hint$s:',
-        );
-        for (var hint in hints) {
-          log.warning("* ${hint.split('\n').join('\n  ')}");
-        }
-        log.warning('');
-      }
+      log.message(sections.join('\n'));
     });
   }
 
-  /// Returns the [files] that are inside [dir] (relative to the package
-  /// entrypoint).
+  /// Returns the [files] that are [path] or inside [path] (relative to the
+  /// package entrypoint).
   // TODO(sigurdm): Consider moving this to a more central location.
-  List<String> filesBeneath(String dir, {required bool recursive}) {
-    final base = p.canonicalize(p.join(package.dir, dir));
+  List<String> filesBeneath(String path, {required bool recursive}) {
+    final base = p.canonicalize(p.join(package.dir, path));
     return files
         .where(
           recursive
-              ? (file) => p.isWithin(base, p.canonicalize(file))
+              ? (file) =>
+                  p.isWithin(base, p.canonicalize(file)) ||
+                  p.canonicalize(file) == base
               : (file) => p.canonicalize(p.dirname(file)) == base,
         )
         .toList();
