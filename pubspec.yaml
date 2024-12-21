@@ -1,13 +1,13 @@
 name: dart_pub
 description: A hosted version of the pub tool code for use in other packages
-version: 0.0.3
+version: 0.0.4
 homepage: https://github.com/Rexios80/pub
 
 environment:
   sdk: ^3.5.0
 
 dependencies:
-  analyzer: ^6.8.0
+  analyzer: ^7.0.0
   args: ^2.6.0
   async: ^2.11.0
   cli_util: ^0.4.1
