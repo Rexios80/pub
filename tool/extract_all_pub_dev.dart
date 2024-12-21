@@ -11,11 +11,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:http/http.dart' as http;
-import 'package:pool/pool.dart';
 import 'package:dart_pub/src/http.dart';
 import 'package:dart_pub/src/io.dart';
 import 'package:dart_pub/src/log.dart' as log;
+import 'package:http/http.dart' as http;
+import 'package:pool/pool.dart';
 
 const statusFilename = 'extract_all_pub_status.json';
 

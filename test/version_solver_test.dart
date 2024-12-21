@@ -5,12 +5,12 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:path/path.dart' as p;
 import 'package:dart_pub/src/lock_file.dart';
 import 'package:dart_pub/src/pubspec.dart';
 import 'package:dart_pub/src/source/hosted.dart';
 import 'package:dart_pub/src/source/root.dart';
 import 'package:dart_pub/src/system_cache.dart';
+import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
 import 'descriptor.dart' as d;

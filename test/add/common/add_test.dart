@@ -4,8 +4,8 @@
 
 import 'dart:io' show File;
 
-import 'package:path/path.dart' as p;
 import 'package:dart_pub/src/exit_codes.dart' as exit_codes;
+import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 import 'package:yaml/yaml.dart';
 

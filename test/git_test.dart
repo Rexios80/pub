@@ -4,7 +4,7 @@
 
 import 'dart:typed_data';
 
-import 'package:pub/src/git.dart';
+import 'package:dart_pub/src/git.dart';
 import 'package:test/test.dart';
 
 void main() {

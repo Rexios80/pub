@@ -4,8 +4,8 @@
 
 import 'dart:convert';
 
-import 'package:path/path.dart' as p;
 import 'package:dart_pub/src/io.dart';
+import 'package:path/path.dart' as p;
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:test/test.dart';
 

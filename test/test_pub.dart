@@ -17,8 +17,6 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:async/async.dart';
-import 'package:http/testing.dart';
-import 'package:path/path.dart' as p;
 import 'package:dart_pub/src/entrypoint.dart';
 import 'package:dart_pub/src/exit_codes.dart' as exit_codes;
 import 'package:dart_pub/src/git.dart' as git;
@@ -31,10 +29,12 @@ import 'package:dart_pub/src/source/hosted.dart';
 import 'package:dart_pub/src/system_cache.dart';
 import 'package:dart_pub/src/utils.dart';
 import 'package:dart_pub/src/validator.dart';
+import 'package:http/testing.dart';
+import 'package:path/path.dart' as p;
 import 'package:pub_semver/pub_semver.dart';
 import 'package:tar/tar.dart';
-import 'package:test/test.dart' hide fail;
 import 'package:test/test.dart' as test show fail;
+import 'package:test/test.dart' hide fail;
 import 'package:test_process/test_process.dart';
 
 import 'descriptor.dart' as d;

@@ -4,9 +4,9 @@
 
 import 'dart:io';
 
-import 'package:path/path.dart' as p;
 import 'package:dart_pub/src/exit_codes.dart' as exit_codes;
 import 'package:dart_pub/src/exit_codes.dart';
+import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
 import '../descriptor.dart' as d;

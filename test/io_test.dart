@@ -6,9 +6,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:path/path.dart' as p;
 import 'package:dart_pub/src/exceptions.dart';
 import 'package:dart_pub/src/io.dart';
+import 'package:path/path.dart' as p;
 import 'package:tar/tar.dart';
 import 'package:test/test.dart';
 
