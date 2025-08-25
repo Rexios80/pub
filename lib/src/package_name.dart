@@ -86,10 +86,10 @@ class PackageId {
 
   /// Creates an ID for the given root package.
   static PackageId root(Package package) => PackageId(
-        package.name,
-        package.version,
-        ResolvedRootDescription(RootDescription(package.dir)),
-      );
+    package.name,
+    package.version,
+    ResolvedRootDescription(RootDescription(package.dir)),
+  );
 
   @override
   int get hashCode => Object.hash(name, version, description);
@@ -174,7 +174,7 @@ class PackageRange {
   bool get _showVersionConstraint {
     if (isRoot) return false;
     if (!constraint.isAny) return true;
-    return description.source.hasMultipleVersions;
+    return description.hasMultipleVersions;
   }
 
   /// Returns a copy of `this` with the same semantics, but with a `^`-style
@@ -242,14 +242,14 @@ class PackageDetail {
     this.showVersion,
     bool? showSource,
     bool? showDescription,
-  })  : showSource = showDescription == true ? true : showSource,
-        showDescription = showDescription ?? false;
+  }) : showSource = showDescription == true ? true : showSource,
+       showDescription = showDescription ?? false;
 
   /// Returns a [PackageDetail] with the maximum amount of detail between `this`
   /// and [other].
   PackageDetail max(PackageDetail other) => PackageDetail(
-        showVersion: showVersion! || other.showVersion!,
-        showSource: showSource! || other.showSource!,
-        showDescription: showDescription || other.showDescription,
-      );
+    showVersion: showVersion! || other.showVersion!,
+    showSource: showSource! || other.showSource!,
+    showDescription: showDescription || other.showDescription,
+  );
 }

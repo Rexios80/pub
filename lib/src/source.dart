@@ -51,12 +51,6 @@ abstract class Source {
   /// all sources.
   String get name;
 
-  /// Whether this source can choose between multiple versions of the same
-  /// package during version solving.
-  ///
-  /// Defaults to `false`.
-  bool get hasMultipleVersions => false;
-
   /// Parses a [PackageRef] from a name and a user-provided [description].
   ///
   /// When a [Pubspec] is parsed, it reads in the description for each
@@ -81,7 +75,7 @@ abstract class Source {
   PackageRef parseRef(
     String name,
     Object? description, {
-    required Description containingDescription,
+    required ResolvedDescription containingDescription,
     required LanguageVersion languageVersion,
   });
 
@@ -183,13 +177,24 @@ abstract class Source {
 ///
 /// For a hosted package this would be the host url.
 ///
-/// For a git package this would be the repo url and a ref and a path inside
-/// the repo.
+/// For a git package this would be the repo url and a ref and a path inside the
+/// repo.
+///
+/// For a path package it is the path.
 ///
 /// This is the information that goes into a `pubspec.yaml` dependency together
 /// with a version constraint.
+///
+/// After resolution we might know more about the specifics of the package that
+/// pins the content down (such as its content-hash or git commit id) this is
+/// represented by a [ResolvedDescription].
 abstract class Description {
   Source get source;
+
+  /// Whether the source can choose between multiple versions of this
+  /// package during version solving.
+  bool get hasMultipleVersions;
+
   Object? serializeForPubspec({
     required String? containingDir,
     required LanguageVersion languageVersion,

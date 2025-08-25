@@ -76,8 +76,7 @@ void basicGraph() {
     );
   });
 
-  test(
-      'shared dependency where dependent version in turn affects other '
+  test('shared dependency where dependent version in turn affects other '
       'dependencies', () async {
     await servePackages()
       ..serve('foo', '1.0.0')
@@ -167,8 +166,7 @@ void withLockFile() {
     await expectResolves(result: {'foo': '1.0.2', 'bar': '1.0.2'});
   });
 
-  test(
-      'unlocks dependencies if necessary to ensure that a new '
+  test('unlocks dependencies if necessary to ensure that a new '
       'dependency is satisfied', () async {
     await servePackages()
       ..serve('foo', '1.0.0', deps: {'bar': '<2.0.0'})
@@ -200,8 +198,7 @@ void withLockFile() {
   });
 
   // Issue 1853
-  test(
-      'produces a nice message for a locked dependency '
+  test('produces a nice message for a locked dependency '
       "that's the only version of its package", () async {
     await servePackages()
       ..serve('foo', '1.0.0', deps: {'bar': '>=2.0.0'})
@@ -436,8 +433,10 @@ void unsolvable() {
 
     await d.appDir(dependencies: {'foo': '>=1.0.0 <2.0.0'}).create();
     await expectResolves(
-      error: contains('''
-Because myapp depends on foo ^1.0.0 which doesn't match any versions, version solving failed.'''),
+      error: contains(
+        '''
+Because myapp depends on foo ^1.0.0 which doesn't match any versions, version solving failed.''',
+      ),
     );
   });
 
@@ -503,39 +502,52 @@ Because myapp depends on foo ^1.0.0 which doesn't match any versions, version so
     await expectResolves(
       error: allOf([
         contains(
-            'Because every version of bar depends on shared from hosted on '
-            'http://localhost:'),
-        contains(' and every version of foo depends on shared from hosted on '
-            'http://localhost:'),
+          'Because every version of bar depends on shared from hosted on '
+          'http://localhost:',
+        ),
+        contains(
+          ' and every version of foo depends on shared from hosted on '
+          'http://localhost:',
+        ),
         contains(', bar is incompatible with foo.'),
-        contains('So, because myapp depends on both foo 1.0.0 and bar 1.0.0, '
-            'version solving failed.'),
+        contains(
+          'So, because myapp depends on both foo 1.0.0 and bar 1.0.0, '
+          'version solving failed.',
+        ),
       ]),
     );
   });
 
   test('mismatched sources', () async {
     await d.dir('shared', [d.libPubspec('shared', '1.0.0')]).create();
-
-    await servePackages()
-      ..serve('foo', '1.0.0', deps: {'shared': '1.0.0'})
-      ..serve(
+    await d.dir('bar', [
+      d.libPubspec(
         'bar',
         '1.0.0',
         deps: {
           'shared': {'path': p.join(d.sandbox, 'shared')},
         },
-      )
+      ),
+    ]).create();
+    await servePackages()
+      ..serve('foo', '1.0.0', deps: {'shared': '1.0.0'})
       ..serve('shared', '1.0.0');
 
-    await d.appDir(dependencies: {'foo': '1.0.0', 'bar': '1.0.0'}).create();
+    await d
+        .appDir(
+          dependencies: {
+            'foo': '1.0.0',
+            'bar': {'path': '../bar'},
+          },
+        )
+        .create();
     await expectResolves(
       error: equalsIgnoringWhitespace('''
-      Because every version of bar depends on shared from path and every
-        version of foo depends on shared from hosted, bar is incompatible with
-        foo.
-      So, because myapp depends on both foo 1.0.0 and bar 1.0.0, version
-        solving failed.
+ Because every version of bar from path depends on shared
+ from path and every version of foo depends on shared from hosted,
+ bar from path is incompatible with foo.
+So, because myapp depends on both foo 1.0.0 and bar from path,
+version solving failed.
     '''),
     );
   });
@@ -570,8 +582,10 @@ Because myapp depends on foo ^1.0.0 which doesn't match any versions, version so
     await d.appDir(dependencies: {'a': 'any', 'b': '>1.0.0'}).create();
 
     await expectResolves(
-      error: contains('''
-Because myapp depends on b >1.0.0 which doesn't match any versions, version solving failed.'''),
+      error: contains(
+        '''
+Because myapp depends on b >1.0.0 which doesn't match any versions, version solving failed.''',
+      ),
     );
   });
 
@@ -600,7 +614,8 @@ Because myapp depends on b >1.0.0 which doesn't match any versions, version solv
       ..serve('di', '0.0.36', deps: {'analyzer': '>=0.13.0 <0.14.0'});
 
     await d
-        .appDir(dependencies: {'angular': 'any', 'collection': 'any'}).create();
+        .appDir(dependencies: {'angular': 'any', 'collection': 'any'})
+        .create();
     await expectResolves(
       error: equalsIgnoringWhitespace('''
       Because every version of angular depends on di ^0.0.32 which depends on
@@ -614,11 +629,13 @@ Because myapp depends on b >1.0.0 which doesn't match any versions, version solv
 
 void badSource() {
   test('fail if the root package has a bad source in dep', () async {
-    await d.appDir(
-      dependencies: {
-        'foo': {'bad': 'any'},
-      },
-    ).create();
+    await d
+        .appDir(
+          dependencies: {
+            'foo': {'bad': 'any'},
+          },
+        )
+        .create();
     await expectResolves(
       error: equalsIgnoringWhitespace('''
       Because myapp depends on foo from unknown source "bad", version solving
@@ -716,12 +733,14 @@ void badSource() {
       ..serve('baz', '1.0.0');
     await d.dir('baz', [d.libPubspec('baz', '1.0.0')]).create();
 
-    await d.appDir(
-      dependencies: {
-        'foo': 'any',
-        'baz': {'path': '../baz'},
-      },
-    ).create();
+    await d
+        .appDir(
+          dependencies: {
+            'foo': 'any',
+            'baz': {'path': '../baz'},
+          },
+        )
+        .create();
     await expectResolves(
       error: equalsIgnoringWhitespace('''
       Because every version of foo depends on bar any which depends on baz any,
@@ -794,7 +813,8 @@ void backtracking() {
     await expectResolves(
       // We avoid equalsIgnoringWhitespace() here because we want to test the
       // formatting of the line number.
-      error: '    Because foo <1.1.0 depends on a ^1.0.0 which depends on b '
+      error:
+          '    Because foo <1.1.0 depends on a ^1.0.0 which depends on b '
           '^2.0.0, foo <1.1.0 requires b ^2.0.0.\n'
           '(1) So, because foo <1.1.0 depends on b ^1.0.0, foo <1.1.0 is '
           'forbidden.\n'
@@ -876,7 +896,7 @@ void backtracking() {
   // dependencies are traversed breadth-first (all of myapps's immediate deps
   // before any other their deps).
   //
-  // This means it doesn't discover the source conflict until after selecting
+  // This means it doesn't discover the version conflict until after selecting
   // c. When that happens, it should backjump past c instead of trying older
   // versions of it since they aren't related to the conflict.
   test('successful backjump to conflicting source', () async {
@@ -884,21 +904,18 @@ void backtracking() {
 
     await servePackages()
       ..serve('a', '1.0.0')
+      ..serve('a', '2.0.0')
       ..serve('b', '1.0.0', deps: {'a': 'any'})
-      ..serve(
-        'b',
-        '2.0.0',
-        deps: {
-          'a': {'path': p.join(d.sandbox, 'a')},
-        },
-      )
+      ..serve('b', '2.0.0', deps: {'a': '^2.0.0'})
       ..serve('c', '1.0.0')
       ..serve('c', '2.0.0')
       ..serve('c', '3.0.0')
       ..serve('c', '4.0.0')
       ..serve('c', '5.0.0');
 
-    await d.appDir(dependencies: {'a': 'any', 'b': 'any', 'c': 'any'}).create();
+    await d
+        .appDir(dependencies: {'a': '1.0.0', 'b': 'any', 'c': 'any'})
+        .create();
     await expectResolves(result: {'a': '1.0.0', 'b': '1.0.0', 'c': '5.0.0'});
   });
 
@@ -933,29 +950,39 @@ void backtracking() {
   // fail in this case with no backtracking.
   test('failing backjump to conflicting source', () async {
     await d.dir('a', [d.libPubspec('a', '1.0.0')]).create();
-
-    await servePackages()
-      ..serve('a', '1.0.0')
-      ..serve(
+    await d.dir('b', [
+      d.libPubspec(
         'b',
         '1.0.0',
         deps: {
           'a': {'path': p.join(d.sandbox, 'shared')},
         },
-      )
+      ),
+    ]).create();
+
+    await servePackages()
+      ..serve('a', '1.0.0')
       ..serve('c', '1.0.0')
       ..serve('c', '2.0.0')
       ..serve('c', '3.0.0')
       ..serve('c', '4.0.0')
       ..serve('c', '5.0.0');
 
-    await d.appDir(dependencies: {'a': 'any', 'b': 'any', 'c': 'any'}).create();
+    await d
+        .appDir(
+          dependencies: {
+            'a': 'any',
+            'b': {'path': '../b'},
+            'c': 'any',
+          },
+        )
+        .create();
     await expectResolves(
       error: equalsIgnoringWhitespace('''
-      Because every version of b depends on a from path and myapp depends on
-        a from hosted, b is forbidden.
-      So, because myapp depends on b any, version solving failed.
-    '''),
+Because every version of b from path depends on a from path 
+and myapp depends on a from hosted, b from path is forbidden.
+So, because myapp depends on b from path, version solving failed.
+'''),
     );
   });
 
@@ -983,8 +1010,10 @@ void backtracking() {
     await d.appDir(dependencies: {'a': 'any', 'b': 'any', 'c': 'any'}).create();
     await expectResolves(
       error: allOf([
-        contains('Because every version of b depends on a from hosted on '
-            'http://localhost:'),
+        contains(
+          'Because every version of b depends on a from hosted on '
+          'http://localhost:',
+        ),
         contains(' and myapp depends on a from hosted on http://localhost:'),
         contains(', b is forbidden.'),
         contains('So, because myapp depends on b any, version solving failed.'),
@@ -1229,8 +1258,7 @@ Because myapp requires SDK version 2.12.0, version solving failed.'''),
     await expectResolves(result: {'foo': '1.0.0', 'bar': '2.0.0'});
   });
 
-  test(
-      'selects a dependency version that allows a transitive '
+  test('selects a dependency version that allows a transitive '
       'dependency that allows the SDK', () async {
     await servePackages()
       ..serve('foo', '1.0.0', deps: {'bar': '1.0.0'})
@@ -1438,10 +1466,7 @@ void sdkConstraint() {
       await d.dir(appPath, [
         d.pubspec({
           'name': 'myapp',
-          'environment': {
-            'sdk': '>3.1.2+3',
-            'flutter': '1.2.3',
-          },
+          'environment': {'sdk': '>3.1.2+3', 'flutter': '1.2.3'},
         }),
       ]).create();
 
@@ -1521,17 +1546,19 @@ void prerelease() {
     await expectResolves(result: {'a': '1.1.0'});
   });
 
-  test('prefer a stable version even if constraint mentions unstable',
-      () async {
-    await servePackages()
-      ..serve('a', '1.0.0')
-      ..serve('a', '1.1.0')
-      ..serve('a', '2.0.0-dev')
-      ..serve('a', '2.0.0');
+  test(
+    'prefer a stable version even if constraint mentions unstable',
+    () async {
+      await servePackages()
+        ..serve('a', '1.0.0')
+        ..serve('a', '1.1.0')
+        ..serve('a', '2.0.0-dev')
+        ..serve('a', '2.0.0');
 
-    await d.appDir(dependencies: {'a': '<=2.0.0-dev'}).create();
-    await expectResolves(result: {'a': '1.1.0'});
-  });
+      await d.appDir(dependencies: {'a': '<=2.0.0-dev'}).create();
+      await expectResolves(result: {'a': '1.1.0'});
+    },
+  );
 
   test('use pre-release when desired', () async {
     await servePackages()
@@ -1562,12 +1589,7 @@ void prerelease() {
       ..serve('b', '1.1.0-dev');
 
     await d.appDir(dependencies: {'a': '^1.0.0'}).create();
-    await expectResolves(
-      result: {
-        'a': '1.1.0',
-        'b': '1.1.0-dev',
-      },
-    );
+    await expectResolves(result: {'a': '1.1.0', 'b': '1.1.0-dev'});
   });
 
   test('backtracks pre-release choice with direct dependency', () async {
@@ -1577,19 +1599,17 @@ void prerelease() {
       ..serve('b', '1.0.0')
       ..serve('b', '1.1.0-dev');
 
-    await d.appDir(
-      dependencies: {
-        'a': '^1.0.0',
-        'b':
-            '^1.0.0', // Direct dependency prevents us from using a pre-release.
-      },
-    ).create();
-    await expectResolves(
-      result: {
-        'a': '1.0.0',
-        'b': '1.0.0',
-      },
-    );
+    await d
+        .appDir(
+          dependencies: {
+            'a': '^1.0.0',
+            'b':
+                // Direct dependency prevents us from using a pre-release.
+                '^1.0.0',
+          },
+        )
+        .create();
+    await expectResolves(result: {'a': '1.0.0', 'b': '1.0.0'});
   });
 
   test('backtracking pre-release fails with indirect dependency', () async {
@@ -1602,18 +1622,16 @@ void prerelease() {
       ..serve('b', '1.1.0-dev')
       ..serve('c', '1.0.0', deps: {'b': '^1.0.0'});
 
-    await d.appDir(
-      dependencies: {
-        'a': '^1.0.0',
-        'c': '^1.0.0', // This doesn't not prevent using a pre-release.
-      },
-    ).create();
+    await d
+        .appDir(
+          dependencies: {
+            'a': '^1.0.0',
+            'c': '^1.0.0', // This doesn't not prevent using a pre-release.
+          },
+        )
+        .create();
     await expectResolves(
-      result: {
-        'a': '1.1.0',
-        'b': '1.1.0-dev',
-        'c': '1.0.0',
-      },
+      result: {'a': '1.1.0', 'b': '1.1.0-dev', 'c': '1.0.0'},
     );
   });
 
@@ -1627,12 +1645,7 @@ void prerelease() {
       ..serve('b', '0.17.0', deps: {'a': '1.0.0'})
       ..serve('c', '2.0.1', deps: {});
 
-    await d.appDir(
-      dependencies: {
-        'a': '0.12.0',
-        'b': 'any',
-      },
-    ).create();
+    await d.appDir(dependencies: {'a': '0.12.0', 'b': 'any'}).create();
     await expectResolves(
       error: contains(
         'So, because myapp depends on both '
@@ -1650,11 +1663,7 @@ void prerelease() {
       ..serve('b', '1.1.0-alpha')
       ..serve('a', '1.0.0', deps: {'b': '^1.1.0-alpha'});
 
-    await d.appDir(
-      dependencies: {
-        'a': '^1.0.0',
-      },
-    ).create();
+    await d.appDir(dependencies: {'a': '^1.0.0'}).create();
     await expectResolves(tries: 2);
   });
 }
@@ -1922,8 +1931,7 @@ void downgrade() {
     await expectResolves(result: {'foo': '2.0.0'}, downgrade: true);
   });
 
-  test(
-      'use earliest allowed prerelease if no stable versions match '
+  test('use earliest allowed prerelease if no stable versions match '
       'while downgrading', () async {
     await servePackages()
       ..serve('a', '1.0.0')
@@ -1966,12 +1974,13 @@ Future expectResolves({
   await runPub(
     args: [downgrade ? 'downgrade' : 'get'],
     environment: environment,
-    output: output ??
+    output:
+        output ??
         (error == null
             ? anyOf(
-                contains('Got dependencies!'),
-                matches(RegExp(r'Changed \d+ dependenc(ies|y)!')),
-              )
+              contains('Got dependencies!'),
+              matches(RegExp(r'Changed \d+ dependenc(ies|y)!')),
+            )
             : null),
     error: error,
     silent: contains('Tried ${tries ?? 1} solutions'),
@@ -1982,12 +1991,14 @@ Future expectResolves({
 
   final cache = SystemCache();
   final registry = cache.sources;
-  final lockFile =
-      LockFile.load(p.join(d.sandbox, appPath, 'pubspec.lock'), registry);
+  final lockFile = LockFile.load(
+    p.join(d.sandbox, appPath, 'pubspec.lock'),
+    registry,
+  );
   final resultPubspec = Pubspec.fromMap(
     {'dependencies': result},
     registry,
-    containingDescription: RootDescription('.'),
+    containingDescription: ResolvedRootDescription.fromDir('.'),
   );
 
   final ids = {...lockFile.packages};
@@ -2034,10 +2045,10 @@ void regressions() {
   test('diamond sdk deps', () async {
     await d.dir('flutter', [
       d.dir('bin/cache/pkg', [
-        d.dir(
-          'baz',
-          [d.libDir('baz', 'foo 0.0.1'), d.libPubspec('baz', '0.0.1')],
-        ),
+        d.dir('baz', [
+          d.libDir('baz', 'foo 0.0.1'),
+          d.libPubspec('baz', '0.0.1'),
+        ]),
       ]),
       d.flutterVersion('1.2.3'),
     ]).create();

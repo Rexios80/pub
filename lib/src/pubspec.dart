@@ -61,7 +61,7 @@ class Pubspec extends PubspecBase {
 
   /// It is used to resolve relative paths. And to resolve path-descriptions
   /// from a git dependency as git-descriptions.
-  final Description _containingDescription;
+  final ResolvedDescription _containingDescription;
 
   /// Directories of packages that should resolve together with this package.
   late List<String> workspace = () {
@@ -126,9 +126,9 @@ environment:
       'workspace' => Resolution.workspace,
       'external' => Resolution.external,
       _ => _error(
-          '"resolution" must be one of `workspace`, `local`, `external`',
-          resolutionNode!.span,
-        )
+        '"resolution" must be one of `workspace`, `local`, `external`',
+        resolutionNode!.span,
+      ),
     };
   }();
 
@@ -225,14 +225,12 @@ environment:
         _FileType.pubspec,
       );
     }
-    final constraints = {
-      'dart': SdkConstraint.interpretDartSdkConstraint(
-        originalDartSdkConstraint,
-        defaultUpperBoundConstraint: _includeDefaultSdkConstraint
-            ? _defaultUpperBoundSdkConstraint
-            : null,
-      ),
-    };
+    final dartConstraint = SdkConstraint.interpretDartSdkConstraint(
+      originalDartSdkConstraint,
+      defaultUpperBoundConstraint:
+          _includeDefaultSdkConstraint ? _defaultUpperBoundSdkConstraint : null,
+    );
+    final constraints = {'dart': dartConstraint};
 
     if (yaml is YamlMap) {
       yaml.nodes.forEach((nameNode, constraintNode) {
@@ -250,9 +248,14 @@ environment:
           _packageName,
           _FileType.pubspec,
         );
-        constraints[name] = name == 'flutter'
-            ? SdkConstraint.interpretFlutterSdkConstraint(constraint)
-            : SdkConstraint(constraint);
+        constraints[name] =
+            name == 'flutter'
+                ? SdkConstraint.interpretFlutterSdkConstraint(
+                  constraint,
+                  isRoot: _containingDescription is ResolvedRootDescription,
+                  languageVersion: dartConstraint.languageVersion,
+                )
+                : SdkConstraint(constraint);
       });
     }
     return constraints;
@@ -277,7 +280,7 @@ environment:
     SourceRegistry sources, {
     String? expectedName,
     bool allowOverridesFile = false,
-    required Description containingDescription,
+    required ResolvedDescription containingDescription,
   }) {
     final pubspecPath = p.join(packageDir, pubspecYamlFilename);
     final overridesPath = p.join(packageDir, pubspecOverridesFilename);
@@ -311,19 +314,19 @@ environment:
     String dir, {
     String? expectedName,
     required bool withPubspecOverrides,
-  }) loadRootWithSources(SourceRegistry sources) {
+  })
+  loadRootWithSources(SourceRegistry sources) {
     return (
       String dir, {
       String? expectedName,
       required bool withPubspecOverrides,
-    }) =>
-        Pubspec.load(
-          dir,
-          sources,
-          expectedName: expectedName,
-          allowOverridesFile: withPubspecOverrides,
-          containingDescription: RootDescription(dir),
-        );
+    }) => Pubspec.load(
+      dir,
+      sources,
+      expectedName: expectedName,
+      allowOverridesFile: withPubspecOverrides,
+      containingDescription: ResolvedRootDescription.fromDir(dir),
+    );
   }
 
   Pubspec(
@@ -338,29 +341,34 @@ environment:
     this.workspace = const <String>[],
     this.dependencyOverridesFromOverridesFile = false,
     this.resolution = Resolution.none,
-  })  : _dependencies = dependencies == null
-            ? null
-            : {for (final d in dependencies) d.name: d},
-        _devDependencies = devDependencies == null
-            ? null
-            : {for (final d in devDependencies) d.name: d},
-        _dependencyOverrides = dependencyOverrides == null
-            ? null
-            : {for (final d in dependencyOverrides) d.name: d},
-        _givenSdkConstraints = sdkConstraints ??
-            UnmodifiableMapView({'dart': SdkConstraint(VersionConstraint.any)}),
-        _includeDefaultSdkConstraint = false,
-        sources = sources ??
-            ((String? name) => throw StateError('No source registry given')),
-        _overridesFileFields = null,
-        // This is a dummy value. Dependencies should already be resolved, so we
-        // never need to do relative resolutions.
-        _containingDescription = RootDescription('.'),
-        super(
-          fields == null ? YamlMap() : YamlMap.wrap(fields),
-          name: name,
-          version: version,
-        );
+  }) : _dependencies =
+           dependencies == null
+               ? null
+               : {for (final d in dependencies) d.name: d},
+       _devDependencies =
+           devDependencies == null
+               ? null
+               : {for (final d in devDependencies) d.name: d},
+       _dependencyOverrides =
+           dependencyOverrides == null
+               ? null
+               : {for (final d in dependencyOverrides) d.name: d},
+       _givenSdkConstraints =
+           sdkConstraints ??
+           UnmodifiableMapView({'dart': SdkConstraint(VersionConstraint.any)}),
+       _includeDefaultSdkConstraint = false,
+       sources =
+           sources ??
+           ((String? name) => throw StateError('No source registry given')),
+       _overridesFileFields = null,
+       // This is a dummy value. Dependencies should already be resolved, so we
+       // never need to do relative resolutions.
+       _containingDescription = ResolvedRootDescription.fromDir('.'),
+       super(
+         fields == null ? YamlMap() : YamlMap.wrap(fields),
+         name: name,
+         version: version,
+       );
 
   /// Returns a Pubspec object for an already-parsed map representing its
   /// contents.
@@ -375,23 +383,25 @@ environment:
     YamlMap? overridesFields,
     String? expectedName,
     Uri? location,
-    required Description containingDescription,
-  })  : _overridesFileFields = overridesFields,
-        _includeDefaultSdkConstraint = true,
-        _givenSdkConstraints = null,
-        dependencyOverridesFromOverridesFile = overridesFields != null &&
-            overridesFields.containsKey('dependency_overrides'),
-        _containingDescription = containingDescription,
-        super(
-          fields is YamlMap
-              ? fields
-              : YamlMap.wrap(fields, sourceUrl: location),
-        ) {
+    required ResolvedDescription containingDescription,
+  }) : _overridesFileFields = overridesFields,
+       _includeDefaultSdkConstraint = true,
+       _givenSdkConstraints = null,
+       dependencyOverridesFromOverridesFile =
+           overridesFields != null &&
+           overridesFields.containsKey('dependency_overrides'),
+       _containingDescription = containingDescription,
+       super(
+         fields is YamlMap ? fields : YamlMap.wrap(fields, sourceUrl: location),
+       ) {
     if (overridesFields != null) {
       overridesFields.nodes.forEach((key, _) {
         final keyNode = key as YamlNode;
-        if (!const {'dependency_overrides', 'resolution', 'workspace'}
-            .contains(keyNode.value)) {
+        if (!const {
+          'dependency_overrides',
+          'resolution',
+          'workspace',
+        }.contains(keyNode.value)) {
           throw SourceSpanApplicationException(
             'pubspec_overrides.yaml only supports the '
             '`dependency_overrides`, `resolution` and `workspace` fields.',
@@ -423,9 +433,9 @@ environment:
     Uri? location,
     String? overridesFileContents,
     Uri? overridesLocation,
-    required Description containingDescription,
+    required ResolvedDescription containingDescription,
   }) {
-    late final YamlMap pubspecMap;
+    final YamlMap pubspecMap;
     YamlMap? overridesFileMap;
     try {
       pubspecMap = _ensureMap(loadYamlNode(contents, sourceUrl: location));
@@ -526,16 +536,16 @@ environment:
   ///
   /// This will return at most one error for each field.
   List<SourceSpanApplicationException> get allErrors => _collectErrorsFor([
-        () => name,
-        () => version,
-        () => dependencies,
-        () => devDependencies,
-        () => publishTo,
-        () => executables,
-        () => falseSecrets,
-        () => sdkConstraints,
-        () => ignoredAdvisories,
-      ]);
+    () => name,
+    () => version,
+    () => dependencies,
+    () => devDependencies,
+    () => publishTo,
+    () => executables,
+    () => falseSecrets,
+    () => sdkConstraints,
+    () => ignoredAdvisories,
+  ]);
 
   /// Returns the type of dependency from this package onto [name].
   DependencyType dependencyType(String? name) {
@@ -567,7 +577,7 @@ Map<String, PackageRange> _parseDependencies(
   SourceRegistry sources,
   LanguageVersion languageVersion,
   String? packageName,
-  Description containingDescription, {
+  ResolvedDescription containingDescription, {
   _FileType fileType = _FileType.pubspec,
 }) {
   final dependencies = <String, PackageRange>{};
@@ -579,8 +589,9 @@ Map<String, PackageRange> _parseDependencies(
     _error('"$field" field must be a map.', node.span);
   }
 
-  final nonStringNode = node.nodes.keys
-      .firstWhereOrNull((e) => e is YamlScalar && e.value is! String);
+  final nonStringNode = node.nodes.keys.firstWhereOrNull(
+    (e) => e is YamlScalar && e.value is! String,
+  );
   if (nonStringNode != null) {
     _error(
       'A dependency name must be a string.',
@@ -588,87 +599,83 @@ Map<String, PackageRange> _parseDependencies(
     );
   }
 
-  node.nodes.forEach(
-    (nameNode, specNode) {
-      final name = (nameNode as YamlNode).value;
-      if (name is! String) {
-        _error('A dependency name must be a string.', nameNode.span);
-      }
-      if (!packageNameRegExp.hasMatch(name)) {
-        _error('Not a valid package name.', nameNode.span);
-      }
-      final spec = specNode.value;
-      if (packageName != null && name == packageName) {
-        _error('A package may not list itself as a dependency.', nameNode.span);
-      }
+  node.nodes.forEach((nameNode, specNode) {
+    final name = (nameNode as YamlNode).value;
+    if (name is! String) {
+      _error('A dependency name must be a string.', nameNode.span);
+    }
+    if (!packageNameRegExp.hasMatch(name)) {
+      _error('Not a valid package name.', nameNode.span);
+    }
+    final spec = specNode.value;
+    if (packageName != null && name == packageName) {
+      _error('A package may not list itself as a dependency.', nameNode.span);
+    }
 
-      final String? sourceName;
-      VersionConstraint versionConstraint = VersionRange();
-      YamlNode? descriptionNode;
-      if (spec == null) {
-        sourceName = null;
-      } else if (spec is String) {
-        sourceName = null;
-        versionConstraint =
-            _parseVersionConstraint(specNode, packageName, fileType);
-      } else if (specNode is YamlMap) {
-        // Don't write to the immutable YAML map.
-        final versionNode = specNode.nodes['version'];
-        versionConstraint = _parseVersionConstraint(
-          versionNode,
-          packageName,
-          fileType,
-        );
-        final otherEntries = specNode.nodes.entries
-            .where((entry) => (entry.key as YamlNode).value != 'version')
-            .toList();
-        if (otherEntries.length > 1) {
-          _error('A dependency may only have one source.', specNode.span);
-        } else if (otherEntries.isEmpty) {
-          // Default to a hosted dependency if no source is specified.
-          sourceName = 'hosted';
-        } else {
-          switch (otherEntries.single) {
-            case MapEntry(
-                key: YamlScalar(value: final String s),
-                value: final d
-              ):
-              sourceName = s;
-              descriptionNode = d;
-            case MapEntry(key: final k, value: _):
-              _error(
-                'A source name must be a string.',
-                (k as YamlNode).span,
-              );
-          }
-        }
-      } else {
-        _error(
-          'A dependency specification must be a string or a mapping.',
-          specNode.span,
-        );
-      }
-
-      // Let the source validate the description.
-      final ref = _wrapFormatException(
-        'description',
-        descriptionNode?.span,
-        () {
-          return sources(sourceName).parseRef(
-            name,
-            descriptionNode?.value,
-            containingDescription: containingDescription,
-            languageVersion: languageVersion,
-          );
-        },
+    final String? sourceName;
+    VersionConstraint versionConstraint = VersionRange();
+    YamlNode? descriptionNode;
+    if (spec == null) {
+      sourceName = null;
+    } else if (spec is String) {
+      sourceName = null;
+      versionConstraint = _parseVersionConstraint(
+        specNode,
         packageName,
         fileType,
-        targetPackage: name,
       );
+    } else if (specNode is YamlMap) {
+      // Don't write to the immutable YAML map.
+      final versionNode = specNode.nodes['version'];
+      versionConstraint = _parseVersionConstraint(
+        versionNode,
+        packageName,
+        fileType,
+      );
+      final otherEntries =
+          specNode.nodes.entries
+              .where((entry) => (entry.key as YamlNode).value != 'version')
+              .toList();
+      if (otherEntries.length > 1) {
+        _error('A dependency may only have one source.', specNode.span);
+      } else if (otherEntries.isEmpty) {
+        // Default to a hosted dependency if no source is specified.
+        sourceName = 'hosted';
+      } else {
+        switch (otherEntries.single) {
+          case MapEntry(key: YamlScalar(value: final String s), value: final d):
+            sourceName = s;
+            descriptionNode = d;
+          case MapEntry(key: final k, value: _):
+            _error('A source name must be a string.', (k as YamlNode).span);
+        }
+      }
+    } else {
+      _error(
+        'A dependency specification must be a string or a mapping.',
+        specNode.span,
+      );
+    }
 
-      dependencies[name] = ref.withConstraint(versionConstraint);
-    },
-  );
+    // Let the source validate the description.
+    final ref = _wrapFormatException(
+      'description',
+      descriptionNode?.span,
+      () {
+        return sources(sourceName).parseRef(
+          name,
+          descriptionNode?.value,
+          containingDescription: containingDescription,
+          languageVersion: languageVersion,
+        );
+      },
+      packageName,
+      fileType,
+      targetPackage: name,
+    );
+
+    dependencies[name] = ref.withConstraint(versionConstraint);
+  });
 
   return dependencies;
 }
@@ -729,7 +736,8 @@ T _wrapFormatException<T>(
     var msg = 'Invalid $description';
     final typeName = _fileTypeName(fileType);
     if (targetPackage != null) {
-      msg = '$msg in the "$packageName" $typeName on the "$targetPackage" '
+      msg =
+          '$msg in the "$packageName" $typeName on the "$targetPackage" '
           'dependency';
     }
     msg = '$msg: ${e.message}';
@@ -742,10 +750,7 @@ Never _error(String message, SourceSpan? span, {String? hint}) {
   throw SourceSpanApplicationException(message, span, hint: hint);
 }
 
-enum _FileType {
-  pubspec,
-  pubspecOverrides,
-}
+enum _FileType { pubspec, pubspecOverrides }
 
 String _fileTypeName(_FileType type) {
   switch (type) {
@@ -783,9 +788,10 @@ class SdkConstraint {
         constraint is VersionRange &&
         constraint.max == null &&
         defaultUpperBoundConstraint.allowsAny(constraint)) {
-      constraint = VersionConstraint.intersection(
-        [constraint, defaultUpperBoundConstraint],
-      );
+      constraint = VersionConstraint.intersection([
+        constraint,
+        defaultUpperBoundConstraint,
+      ]);
     }
     // If a package is null safe it should also be compatible with dart 3.
     // Therefore we rewrite a null-safety enabled constraint with the upper
@@ -811,17 +817,26 @@ class SdkConstraint {
     return SdkConstraint(constraint, originalConstraint: originalConstraint);
   }
 
-  // Flutter constraints get special treatment, as Flutter won't be using
-  // semantic versioning to mark breaking releases. We simply ignore upper
-  // bounds.
+  /// Flutter constraints get special treatment, as Flutter won't be using
+  /// semantic versioning to mark breaking releases. We simply ignore upper
+  /// bounds for dependencies.
+  ///
+  /// After language version
+  /// [LanguageVersion.firstVersionRespectingFlutterBoundInRoots] for root
+  /// packages we use the upper bound, allowing app developers to constrain the
+  /// Flutter version.
   factory SdkConstraint.interpretFlutterSdkConstraint(
-    VersionConstraint constraint,
-  ) {
+    VersionConstraint constraint, {
+    required bool isRoot,
+    required LanguageVersion languageVersion,
+  }) {
     if (constraint is VersionRange) {
-      return SdkConstraint(
-        VersionRange(min: constraint.min, includeMin: constraint.includeMin),
-        originalConstraint: constraint,
-      );
+      if (!(isRoot && languageVersion.respectsFlutterBoundInRoots)) {
+        return SdkConstraint(
+          VersionRange(min: constraint.min, includeMin: constraint.includeMin),
+          originalConstraint: constraint,
+        );
+      }
     }
     return SdkConstraint(constraint);
   }

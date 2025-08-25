@@ -24,6 +24,8 @@ import 'cached.dart';
 import 'path.dart';
 import 'root.dart';
 
+typedef TaggedVersion = ({Version version, String commitId});
+
 /// A package source that gets packages from Git repos.
 class GitSource extends CachedSource {
   static GitSource instance = GitSource._();
@@ -37,17 +39,20 @@ class GitSource extends CachedSource {
   PackageRef parseRef(
     String name,
     Object? description, {
-    Description? containingDescription,
+    ResolvedDescription? containingDescription,
     required LanguageVersion languageVersion,
   }) {
     String url;
     String? ref;
     String? path;
+    String? tagPattern;
     if (description is String) {
       url = description;
     } else if (description is! Map) {
-      throw const FormatException('The description must be a Git URL or a map '
-          "with a 'url' key.");
+      throw const FormatException(
+        'The description must be a Git URL or a map '
+        "with a 'url' key.",
+      );
     } else {
       final descriptionUrl = description['url'];
       if (descriptionUrl is! String) {
@@ -60,31 +65,57 @@ class GitSource extends CachedSource {
       final descriptionRef = description['ref'];
       if (descriptionRef is! String?) {
         throw const FormatException(
-            "The 'ref' field of the description must be a "
-            'string.');
+          "The 'ref' field of the description must be a "
+          'string.',
+        );
       }
       ref = descriptionRef;
 
       final descriptionPath = description['path'];
       if (descriptionPath is! String?) {
         throw const FormatException(
-            "The 'path' field of the description must be a "
-            'string.');
+          "The 'path' field of the description must be a "
+          'string.',
+        );
       }
       path = descriptionPath;
 
+      final descriptionTagPattern = description['tag_pattern'];
+
+      if (descriptionTagPattern is! String?) {
+        throw const FormatException(
+          "The 'tag_pattern' field of the description "
+          'must be a string or null.',
+        );
+      } else {
+        if (descriptionTagPattern != null) {
+          if (!languageVersion.supportsTagPattern) {
+            throw FormatException(
+              'Using `git: {tagPattern: }` '
+              'is only supported with a minimum SDK '
+              'constraint of ${LanguageVersion.firstVersionWithTagPattern}.',
+            );
+          }
+          validateTagPattern(descriptionTagPattern);
+        }
+        tagPattern = descriptionTagPattern;
+      }
+
+      if (ref != null && tagPattern != null) {
+        throw const FormatException(
+          'A git description cannot have both a ref and a `tag_pattern`.',
+        );
+      }
       if (languageVersion.forbidsUnknownDescriptionKeys) {
         for (final key in description.keys) {
-          if (!['url', 'ref', 'path'].contains(key)) {
-            throw FormatException(
-              'Unknown key "$key" in description.',
-            );
+          if (!['url', 'ref', 'path', 'tag_pattern'].contains(key)) {
+            throw FormatException('Unknown key "$key" in description.');
           }
         }
       }
     }
 
-    final containingDir = switch (containingDescription) {
+    final containingDir = switch (containingDescription?.description) {
       RootDescription(path: final path) => path,
       PathDescription(path: final path) => path,
       _ => null,
@@ -97,6 +128,7 @@ class GitSource extends CachedSource {
         containingDir: containingDir,
         ref: ref,
         path: _validatedPath(path),
+        tagPattern: tagPattern,
       ),
     );
   }
@@ -109,28 +141,44 @@ class GitSource extends CachedSource {
     String? containingDir,
   }) {
     if (description is! Map) {
-      throw const FormatException("The description must be a map with a 'url' "
-          'key.');
+      throw const FormatException(
+        "The description must be a map with a 'url' "
+        'key.',
+      );
     }
 
     final ref = description['ref'];
     if (ref is! String?) {
       throw const FormatException(
-          "The 'ref' field of the description must be a "
-          'string.');
+        "The 'ref' field of the description must be a "
+        'string.',
+      );
     }
 
     final resolvedRef = description['resolved-ref'];
     if (resolvedRef is! String) {
-      throw const FormatException("The 'resolved-ref' field of the description "
-          'must be a string.');
+      throw const FormatException(
+        "The 'resolved-ref' field of the description "
+        'must be a string.',
+      );
     }
 
     final url = description['url'];
     if (url is! String) {
-      throw const FormatException("The 'url' field of the description "
-          'must be a string.');
+      throw const FormatException(
+        "The 'url' field of the description "
+        'must be a string.',
+      );
     }
+
+    final tagPattern = description['tag-pattern'];
+    if (tagPattern is! String?) {
+      throw const FormatException(
+        "The 'tag_pattern' field of the description "
+        'must be a string.',
+      );
+    }
+
     return PackageId(
       name,
       version,
@@ -138,10 +186,9 @@ class GitSource extends CachedSource {
         GitDescription(
           url: url,
           ref: ref,
-          path: _validatedPath(
-            description['path'],
-          ),
+          path: _validatedPath(description['path']),
           containingDir: containingDir,
+          tagPattern: tagPattern,
         ),
         resolvedRef,
       ),
@@ -161,8 +208,10 @@ class GitSource extends CachedSource {
         // system aren't allowed. This can happen if a hosted or git dependency
         // has a git dependency.
         if (containingDir == null) {
-          throw FormatException('"$url" is a relative path, but this '
-              'isn\'t a local pubspec.');
+          throw FormatException(
+            '"$url" is a relative path, but this '
+            'isn\'t a local pubspec.',
+          );
         }
         // A relative path is stored internally as absolute resolved relative to
         // [containingPath].
@@ -191,8 +240,9 @@ class GitSource extends CachedSource {
     path ??= '.';
     if (path is! String) {
       throw const FormatException(
-          "The 'path' field of the description must be a "
-          'string.');
+        "The 'path' field of the description must be a "
+        'string.',
+      );
     }
 
     // Use Dart's URL parser to validate the URL.
@@ -208,8 +258,9 @@ class GitSource extends CachedSource {
     }
     if (!p.url.isWithin('.', path) && !p.url.equals('.', path)) {
       throw const FormatException(
-          "The 'path' field of the description must not reach outside the "
-          'repository.');
+        "The 'path' field of the description must not reach outside the "
+        'repository.',
+      );
     }
     return p.url.normalize(parsed.toString());
   }
@@ -239,24 +290,34 @@ class GitSource extends CachedSource {
     String? ref,
     String? path,
     SystemCache cache, {
-    required String relativeTo,
+    required String? relativeTo,
+    required String? tagPattern,
   }) async {
+    assert(
+      !(ref != null && tagPattern != null),
+      'Cannot have both a `tagPattern` and a `ref`',
+    );
     final description = GitDescription(
       url: url,
       ref: ref,
       path: path,
       containingDir: relativeTo,
+      tagPattern: tagPattern,
     );
     return await _pool.withResource(() async {
       await _ensureRepoCache(description, cache);
       final path = _repoCachePath(description, cache);
-      final revision = await _firstRevision(path, description.ref);
+
+      final revision =
+          tagPattern != null
+              ? (await _listTaggedVersions(path, tagPattern)).last.commitId
+              : await _firstRevision(path, description.ref);
       final resolvedDescription = ResolvedGitDescription(description, revision);
 
       return Pubspec.parse(
         await _showFileAtRevision(resolvedDescription, 'pubspec.yaml', cache),
         cache.sources,
-        containingDescription: description,
+        containingDescription: resolvedDescription,
       ).name;
     });
   }
@@ -274,8 +335,9 @@ class GitSource extends CachedSource {
     final description = resolvedDescription.description;
     // Normalize the path because Git treats "./" at the beginning of a path
     // specially.
-    var pathInCache =
-        p.normalize(p.join(p.fromUri(description.path), pathInProject));
+    var pathInCache = p.normalize(
+      p.join(p.fromUri(description.path), pathInProject),
+    );
 
     // Git doesn't recognize backslashes in paths, even on Windows.
     if (Platform.isWindows) pathInCache = pathInCache.replaceAll('\\', '/');
@@ -284,13 +346,16 @@ class GitSource extends CachedSource {
     final revision = resolvedDescription.resolvedRef;
 
     try {
-      return await git.run(
-        [_gitDirArg(repoPath), 'show', '$revision:$pathInCache'],
-        workingDir: repoPath,
-      );
+      return await git.run([
+        _gitDirArg(repoPath),
+        'show',
+        '$revision:$pathInCache',
+      ], workingDir: repoPath);
     } on git.GitException catch (_) {
-      fail('Could not find a file named "$pathInCache" in '
-          '${GitDescription.prettyUri(description.url)} $revision.');
+      fail(
+        'Could not find a file named "$pathInCache" in '
+        '${GitDescription.prettyUri(description.url)} $revision.',
+      );
     }
   }
 
@@ -307,35 +372,64 @@ class GitSource extends CachedSource {
     return await _pool.withResource(() async {
       await _ensureRepoCache(description, cache);
       final path = _repoCachePath(description, cache);
-      final revision = await _firstRevision(path, description.ref);
-      final pubspec = await _describeUncached(ref, revision, cache);
+      final result = <PackageId>[];
+      if (description.tagPattern case final String tagPattern) {
+        final versions = await _listTaggedVersions(path, tagPattern);
+        for (final version in versions) {
+          result.add(
+            PackageId(
+              ref.name,
+              version.version,
+              ResolvedGitDescription(description, version.commitId),
+            ),
+          );
+        }
+        return result;
+      } else {
+        final revision = await _firstRevision(path, description.ref);
 
-      return [
-        PackageId(
-          ref.name,
-          pubspec.version,
-          ResolvedGitDescription(description, revision),
-        ),
-      ];
+        final Pubspec pubspec;
+        pubspec = await _describeUncached(ref, revision, cache);
+        result.add(
+          PackageId(
+            ref.name,
+            pubspec.version,
+            ResolvedGitDescription(description, revision),
+          ),
+        );
+        return [
+          PackageId(
+            ref.name,
+            pubspec.version,
+            ResolvedGitDescription(description, revision),
+          ),
+        ];
+      }
     });
   }
 
   /// Since we don't have an easy way to read from a remote Git repo, this
   /// just installs [id] into the system cache, then describes it from there.
   @override
-  Future<Pubspec> describeUncached(PackageId id, SystemCache cache) {
+  Future<Pubspec> describeUncached(PackageId id, SystemCache cache) async {
     final description = id.description;
     if (description is! ResolvedGitDescription) {
       throw StateError('Called with wrong ref');
     }
-    return _pool.withResource(
-      () => _describeUncached(
-        id.toRef(),
-        description.resolvedRef,
-        cache,
-      ),
+    final pubspec = await _pool.withResource(
+      () => _describeUncached(id.toRef(), description.resolvedRef, cache),
     );
+    if (pubspec.version != id.version) {
+      throw PackageNotFoundException(
+        'Expected ${id.name} version ${id.version} '
+        'at commit ${description.resolvedRef}, '
+        'found ${pubspec.version}.',
+      );
+    }
+    return pubspec;
   }
+
+  final Map<(PackageRef, String), Pubspec> _pubspecAtRevisionCache = {};
 
   /// Like [describeUncached], but takes a separate [ref] and Git [revision]
   /// rather than a single ID.
@@ -348,18 +442,16 @@ class GitSource extends CachedSource {
     if (description is! GitDescription) {
       throw ArgumentError('Wrong source');
     }
-    await _ensureRevision(description, revision, cache);
-
-    return Pubspec.parse(
-      await _showFileAtRevision(
-        ResolvedGitDescription(description, revision),
-        'pubspec.yaml',
-        cache,
-      ),
-      cache.sources,
-      expectedName: ref.name,
-      containingDescription: ref.description,
-    );
+    return _pubspecAtRevisionCache[(ref, revision)] ??= await () async {
+      await _ensureRevision(description, revision, cache);
+      final resolvedDescription = ResolvedGitDescription(description, revision);
+      return Pubspec.parse(
+        await _showFileAtRevision(resolvedDescription, 'pubspec.yaml', cache),
+        cache.sources,
+        expectedName: ref.name,
+        containingDescription: resolvedDescription,
+      );
+    }();
   }
 
   /// Clones a Git repo to the local filesystem.
@@ -388,8 +480,10 @@ class GitSource extends CachedSource {
         throw ArgumentError('Wrong source');
       }
       if (!git.isInstalled) {
-        fail('Cannot get ${id.name} from Git (${description.url}).\n'
-            'Please ensure Git is correctly installed.');
+        fail(
+          'Cannot get ${id.name} from Git (${description.url}).\n'
+          'Please ensure Git is correctly installed.',
+        );
       }
 
       ensureDir(p.join(cache.rootDirForSource(this), 'cache'));
@@ -445,33 +539,34 @@ class GitSource extends CachedSource {
 
     final result = <RepairResult>[];
 
-    final packages = listDir(rootDir)
-        .where((entry) => dirExists(p.join(entry, '.git')))
-        .expand((revisionCachePath) {
-          return _readPackageList(revisionCachePath).map((relative) {
-            // If we've already failed to load another package from this
-            // repository, ignore it.
-            if (!dirExists(revisionCachePath)) return null;
+    final packages =
+        listDir(rootDir)
+            .where((entry) => dirExists(p.join(entry, '.git')))
+            .expand((revisionCachePath) {
+              return _readPackageList(revisionCachePath).map((relative) {
+                // If we've already failed to load another package from this
+                // repository, ignore it.
+                if (!dirExists(revisionCachePath)) return null;
 
-            final packageDir = p.join(revisionCachePath, relative);
-            try {
-              return Package.load(
-                packageDir,
-                loadPubspec: Pubspec.loadRootWithSources(cache.sources),
-              );
-            } catch (error, stackTrace) {
-              log.error('Failed to load package', error, stackTrace);
-              final name = p.basename(revisionCachePath).split('-').first;
-              result.add(
-                RepairResult(name, Version.none, this, success: false),
-              );
-              tryDeleteEntry(revisionCachePath);
-              return null;
-            }
-          });
-        })
-        .nonNulls
-        .toList();
+                final packageDir = p.join(revisionCachePath, relative);
+                try {
+                  return Package.load(
+                    packageDir,
+                    loadPubspec: Pubspec.loadRootWithSources(cache.sources),
+                  );
+                } catch (error, stackTrace) {
+                  log.error('Failed to load package', error, stackTrace);
+                  final name = p.basename(revisionCachePath).split('-').first;
+                  result.add(
+                    RepairResult(name, Version.none, this, success: false),
+                  );
+                  tryDeleteEntry(revisionCachePath);
+                  return null;
+                }
+              });
+            })
+            .nonNulls
+            .toList();
 
     // Note that there may be multiple packages with the same name and version
     // (pinned to different commits). The sort order of those is unspecified.
@@ -482,13 +577,19 @@ class GitSource extends CachedSource {
       // ignore it.
       if (!dirExists(package.dir)) continue;
 
-      log.message('Resetting Git repository for '
-          '${log.bold(package.name)} ${package.version}...');
+      log.message(
+        'Resetting Git repository for '
+        '${log.bold(package.name)} ${package.version}...',
+      );
 
       try {
         // Remove all untracked files.
-        await git
-            .run(['clean', '-d', '--force', '-x'], workingDir: package.dir);
+        await git.run([
+          'clean',
+          '-d',
+          '--force',
+          '-x',
+        ], workingDir: package.dir);
 
         // Discard all changes to tracked files.
         await git.run(['reset', '--hard', 'HEAD'], workingDir: package.dir);
@@ -497,8 +598,10 @@ class GitSource extends CachedSource {
           RepairResult(package.name, package.version, this, success: true),
         );
       } on git.GitException catch (error, stackTrace) {
-        log.error('Failed to reset ${log.bold(package.name)} '
-            '${package.version}. Error:\n$error');
+        log.error(
+          'Failed to reset ${log.bold(package.name)} '
+          '${package.version}. Error:\n$error',
+        );
         log.fine(stackTrace.toString());
         result.add(
           RepairResult(package.name, package.version, this, success: false),
@@ -607,10 +710,11 @@ class GitSource extends CachedSource {
     }
     var isValid = true;
     try {
-      final result = await git.run(
-        [_gitDirArg(dirPath), 'rev-parse', '--is-inside-git-dir'],
-        workingDir: dirPath,
-      );
+      final result = await git.run([
+        _gitDirArg(dirPath),
+        'rev-parse',
+        '--is-inside-git-dir',
+      ], workingDir: dirPath);
       if (result.trim() != 'true') {
         isValid = false;
       }
@@ -657,17 +761,58 @@ class GitSource extends CachedSource {
   String _packageListPath(String revisionCachePath) =>
       p.join(revisionCachePath, '.git/pub-packages');
 
+  /// List all tags in [path] and returns all versions matching
+  /// [tagPattern].
+  Future<List<TaggedVersion>> _listTaggedVersions(
+    String path,
+    String tagPattern,
+  ) async {
+    final output = await git.run([
+      'tag',
+      '--list',
+      '--format',
+      // We can use space here, as it is not allowed in a git tag
+      // https://git-scm.com/docs/git-check-ref-format
+      '%(refname:lstrip=2) %(objectname)',
+    ], workingDir: path);
+    final lines = output.trim().split('\n');
+    final result = <TaggedVersion>[];
+    final compiledTagPattern = compileTagPattern(tagPattern);
+    for (final line in lines) {
+      final parts = line.split(' ');
+      if (parts.length != 2) {
+        throw PackageNotFoundException('Bad output from `git tag --list`');
+      }
+      final match = compiledTagPattern.firstMatch(parts[0]);
+      if (match == null) continue;
+
+      final Version version;
+
+      try {
+        version = Version.parse(match[1]!);
+      } on FormatException catch (e) {
+        throw StateError(
+          'Matched part ${Version.parse(match[1]!)} did not match version $e.',
+        );
+      }
+      result.add((version: version, commitId: parts[1]));
+    }
+    return result;
+  }
+
   /// Runs "git rev-list" on [reference] in [path] and returns the first result.
   ///
   /// This assumes that the canonical clone already exists.
   Future<String> _firstRevision(String path, String reference) async {
     final String output;
     try {
-      output = (await git.run(
-        [_gitDirArg(path), 'rev-list', '--max-count=1', reference],
-        workingDir: path,
-      ))
-          .trim();
+      output =
+          (await git.run([
+            _gitDirArg(path),
+            'rev-list',
+            '--max-count=1',
+            reference,
+          ], workingDir: path)).trim();
     } on git.GitException catch (e) {
       throw PackageNotFoundException(
         "Could not find git ref '$reference' (${e.stderr})",
@@ -686,11 +831,7 @@ class GitSource extends CachedSource {
   /// out the working tree, but instead makes the repository a local mirror of
   /// the remote repository. See the manpage for `git clone` for more
   /// information.
-  Future<void> _clone(
-    String from,
-    String to, {
-    bool mirror = false,
-  }) async {
+  Future<void> _clone(String from, String to, {bool mirror = false}) async {
     // Git on Windows does not seem to automatically create the destination
     // directory.
     ensureDir(to);
@@ -726,14 +867,15 @@ class GitSource extends CachedSource {
   /// Checks out the reference [ref] in [repoPath].
   Future<void> _checkOut(String repoPath, String ref) {
     return git
-        .run(['checkout', ref], workingDir: repoPath).then((result) => null);
+        .run(['checkout', ref], workingDir: repoPath)
+        .then((result) => null);
   }
 
   String _revisionCachePath(PackageId id, SystemCache cache) => p.join(
-        cache.rootDirForSource(this),
-        '${_repoName(id.description.description as GitDescription)}-'
-        '${(id.description as ResolvedGitDescription).resolvedRef}',
-      );
+    cache.rootDirForSource(this),
+    '${_repoName(id.description.description as GitDescription)}-'
+    '${(id.description as ResolvedGitDescription).resolvedRef}',
+  );
 
   /// Returns the path to the canonical clone of the repository referred to by
   /// [description] (the one in `<system cache>/git/cache`).
@@ -771,6 +913,12 @@ class GitDescription extends Description {
   /// not allow strings of the form: 'git@github.com:dart-lang/pub.git'.
   final String url;
 
+  /// A string containing [tagPatternVersionMarker] used to match version
+  /// numbers in a git tag. For example "v{{version}}".
+  ///
+  /// Only one of [ref] and [tagPattern] can be non-`null` at a time.
+  final String? tagPattern;
+
   /// `true` if [url] was parsed from a relative url.
   final bool relative;
 
@@ -782,19 +930,23 @@ class GitDescription extends Description {
   /// Represented as a relative url.
   final String path;
 
+  late final RegExp compiledTagPattern = compileTagPattern(tagPattern!);
+
   GitDescription.raw({
     required this.url,
     required this.relative,
     required String? ref,
     required String? path,
-  })  : ref = ref ?? 'HEAD',
-        path = path ?? '.';
+    required this.tagPattern,
+  }) : ref = ref ?? 'HEAD',
+       path = path ?? '.';
 
   factory GitDescription({
     required String url,
     required String? ref,
     required String? path,
     required String? containingDir,
+    required String? tagPattern,
   }) {
     final validatedUrl = GitSource._validatedUrl(url, containingDir);
     return GitDescription.raw(
@@ -802,12 +954,14 @@ class GitDescription extends Description {
       relative: validatedUrl.wasRelative,
       ref: ref,
       path: path,
+      tagPattern: tagPattern,
     );
   }
 
   @override
   String format() {
-    var result = '${prettyUri(url)} at '
+    var result =
+        '${prettyUri(url)} at '
         '$ref';
     if (path != '.') result += ' in $path';
     return result;
@@ -818,17 +972,19 @@ class GitDescription extends Description {
     required String? containingDir,
     required LanguageVersion languageVersion,
   }) {
-    final relativeUrl = containingDir != null && relative
-        ? p.url.relative(
-            url,
-            from: p.toUri(p.normalize(p.absolute(containingDir))).toString(),
-          )
-        : url;
-    if (ref == 'HEAD' && path == '.') return relativeUrl;
+    final relativeUrl =
+        containingDir != null && relative
+            ? p.url.relative(
+              url,
+              from: p.toUri(p.normalize(p.absolute(containingDir))).toString(),
+            )
+            : url;
+    if (ref == 'HEAD' && path == '.' && tagPattern == null) return relativeUrl;
     return {
       'url': relativeUrl,
       if (ref != 'HEAD') 'ref': ref,
       if (path != '.') 'path': path,
+      if (tagPattern != null) 'tag_pattern': tagPattern,
     };
   }
 
@@ -844,11 +1000,12 @@ class GitDescription extends Description {
   }
 
   GitDescription withRef(String newRef) => GitDescription.raw(
-        url: url,
-        relative: relative,
-        ref: newRef,
-        path: path,
-      );
+    url: url,
+    relative: relative,
+    ref: newRef,
+    path: path,
+    tagPattern: tagPattern,
+  );
 
   @override
   int get hashCode => Object.hash(url, ref, path);
@@ -864,6 +1021,9 @@ class GitDescription extends Description {
     }
     return p.prettyUri(url);
   }
+
+  @override
+  bool get hasMultipleVersions => tagPattern != null;
 }
 
 class ResolvedGitDescription extends ResolvedDescription {
@@ -876,7 +1036,8 @@ class ResolvedGitDescription extends ResolvedDescription {
 
   @override
   String format() {
-    var result = '${GitDescription.prettyUri(description.url)} at '
+    var result =
+        '${GitDescription.prettyUri(description.url)} at '
         '${resolvedRef.substring(0, 6)}';
     if (description.path != '.') result += ' in ${description.path}';
     return result;
@@ -884,15 +1045,20 @@ class ResolvedGitDescription extends ResolvedDescription {
 
   @override
   Object? serializeForLockfile({required String? containingDir}) {
-    final url = description.relative && containingDir != null
-        ? p.url.relative(
-            description.url,
-            from: Uri.file(p.absolute(containingDir)).toString(),
-          )
-        : description.url;
+    final url =
+        description.relative && containingDir != null
+            ? p.url.relative(
+              description.url,
+              from: Uri.file(p.absolute(containingDir)).toString(),
+            )
+            : description.url;
     return {
       'url': url,
-      'ref': description.ref,
+
+      if (description.tagPattern == null)
+        'ref': description.ref
+      else
+        'tag-pattern': description.tagPattern,
       'resolved-ref': resolvedRef,
       'path': description.path,
     };
@@ -916,7 +1082,47 @@ class _ValidatedUrl {
 }
 
 String _gitDirArg(String path) {
+  path = p.absolute(path);
   final forwardSlashPath =
       Platform.isWindows ? path.replaceAll('\\', '/') : path;
   return '--git-dir=$forwardSlashPath';
+}
+
+const String tagPatternVersionMarker = '{{version}}';
+
+// Adapted from pub_semver-2.1.4/lib/src/version.dart
+const versionPattern =
+    r'(\d+)\.(\d+)\.(\d+)' // Version number.
+    r'(-([0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*))?' // Pre-release.
+    r'(\+([0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*))?'; // build
+
+/// Throws [FormatException] if it doesn't contain a single instance of
+/// [tagPatternVersionMarker].
+void validateTagPattern(String tagPattern) {
+  final parts = tagPattern.split(tagPatternVersionMarker);
+  if (parts.length != 2) {
+    throw const FormatException(
+      'The `tag_pattern` must contain a single "{{version}}" '
+      'to match different versions',
+    );
+  }
+}
+
+/// Takes a [tagPattern] and returns a [RegExp] matching the relevant tags.
+///
+/// The tagPattern should contain '{{version}}' which will match a pub_semver
+/// version. The rest of the tagPattern is matched verbatim.
+///
+/// Assumes that [tagPattern] has a single occurence of
+/// [tagPatternVersionMarker].
+RegExp compileTagPattern(String tagPattern) {
+  final parts = tagPattern.split(tagPatternVersionMarker);
+  final before = parts[0];
+  final after = parts[1];
+
+  return RegExp(
+    r'^'
+    '$before($versionPattern)$after'
+    r'$',
+  );
 }

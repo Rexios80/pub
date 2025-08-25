@@ -27,21 +27,27 @@ class LoginCommand extends PubCommand {
     if (credentials == null) {
       final userInfo = await _retrieveUserInfo();
       if (userInfo == null) {
-        log.warning('Could not retrieve your user-details.\n'
-            'You might have to run `$topLevelProgram pub logout` '
-            'to delete your credentials and try again.');
+        log.warning(
+          'Could not retrieve your user-details.\n'
+          'You might have to run `$topLevelProgram pub logout` '
+          'to delete your credentials and try again.',
+        );
       } else {
         log.message('You are now logged in as $userInfo');
       }
     } else {
       final userInfo = await _retrieveUserInfo();
       if (userInfo == null) {
-        log.warning('Your credentials seems broken.\n'
-            'Run `$topLevelProgram pub logout` '
-            'to delete your credentials and try again.');
+        log.warning(
+          'Your credentials seems broken.\n'
+          'Run `$topLevelProgram pub logout` '
+          'to delete your credentials and try again.',
+        );
       }
-      log.warning('You are already logged in as $userInfo\n'
-          'Run `$topLevelProgram pub logout` to log out and try again.');
+      log.warning(
+        'You are already logged in as $userInfo\n'
+        'Run `$topLevelProgram pub logout` to log out and try again.',
+      );
     }
   }
 
@@ -50,9 +56,7 @@ class LoginCommand extends PubCommand {
       final discovery = await oauth2.fetchOidcDiscoveryDocument();
       final userInfoEndpoint = discovery['userinfo_endpoint'];
       if (userInfoEndpoint is! String) {
-        log.fine(
-          'Bad discovery document. userinfo_endpoint not a String',
-        );
+        log.fine('Bad discovery document. userinfo_endpoint not a String');
         return null;
       }
       final userInfoRequest = await client.get(Uri.parse(userInfoEndpoint));
@@ -60,7 +64,9 @@ class LoginCommand extends PubCommand {
       try {
         switch (json.decode(userInfoRequest.body)) {
           case {'name': final String? name, 'email': final String email}:
-            return _UserInfo(name, email);
+            return _UserInfo(name: name, email: email);
+          case {'email': final String email}:
+            return _UserInfo(name: null, email: email);
           default:
             log.fine(
               'Bad response from $userInfoEndpoint: ${userInfoRequest.body}',
@@ -80,7 +86,7 @@ class LoginCommand extends PubCommand {
 class _UserInfo {
   final String? name;
   final String email;
-  _UserInfo(this.name, this.email);
+  _UserInfo({required this.name, required this.email});
   @override
   String toString() => ['<$email>', name ?? ''].join(' ');
 }

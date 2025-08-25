@@ -17,15 +17,16 @@ void main() {
   group('parse()', () {
     final sources = SystemCache().sources;
 
-    final throwsPubspecException =
-        throwsA(const TypeMatcher<SourceSpanApplicationException>());
+    final throwsPubspecException = throwsA(
+      const TypeMatcher<SourceSpanApplicationException>(),
+    );
 
     void expectPubspecException(
       String contents,
       void Function(Pubspec) fn, {
       String? expectedContains,
       String? hintContains,
-      Description? containingDescription,
+      ResolvedDescription? containingDescription,
     }) {
       var expectation = const TypeMatcher<SourceSpanApplicationException>();
       if (expectedContains != null) {
@@ -46,7 +47,8 @@ void main() {
       final pubspec = Pubspec.parse(
         contents,
         sources,
-        containingDescription: containingDescription ?? RootDescription('.'),
+        containingDescription:
+            containingDescription ?? ResolvedRootDescription.fromDir('.'),
       );
       expect(() => fn(pubspec), throwsA(expectation));
     }
@@ -56,33 +58,31 @@ void main() {
       Pubspec.parse(
         'version: not a semver',
         sources,
-        containingDescription: RootDescription('.'),
+        containingDescription: ResolvedRootDescription.fromDir('.'),
       );
     });
 
-    test(
-        "eagerly throws an error if the pubspec name doesn't match the "
+    test("eagerly throws an error if the pubspec name doesn't match the "
         'expected name', () {
       expect(
         () => Pubspec.parse(
           'name: foo',
           sources,
           expectedName: 'bar',
-          containingDescription: RootDescription('.'),
+          containingDescription: ResolvedRootDescription.fromDir('.'),
         ),
         throwsPubspecException,
       );
     });
 
-    test(
-        "eagerly throws an error if the pubspec doesn't have a name and an "
+    test("eagerly throws an error if the pubspec doesn't have a name and an "
         'expected name is passed', () {
       expect(
         () => Pubspec.parse(
           '{}',
           sources,
           expectedName: 'bar',
-          containingDescription: RootDescription('.'),
+          containingDescription: ResolvedRootDescription.fromDir('.'),
         ),
         throwsPubspecException,
       );
@@ -99,7 +99,7 @@ dependencies:
     version: ">=1.2.3 <3.4.5"
 ''',
         sources,
-        containingDescription: RootDescription('.'),
+        containingDescription: ResolvedRootDescription.fromDir('.'),
       );
 
       final foo = pubspec.dependencies['foo']!;
@@ -120,7 +120,7 @@ dependencies:
     version: ">=1.2.3 <0.0.0"
 ''',
         sources,
-        containingDescription: RootDescription('.'),
+        containingDescription: ResolvedRootDescription.fromDir('.'),
       );
 
       final foo = pubspec.dependencies['foo']!;
@@ -134,7 +134,7 @@ dependencies:
 dependencies:
 ''',
         sources,
-        containingDescription: RootDescription('.'),
+        containingDescription: ResolvedRootDescription.fromDir('.'),
       );
 
       expect(pubspec.dependencies, isEmpty);
@@ -151,7 +151,7 @@ dev_dependencies:
     version: ">=1.2.3 <3.4.5"
 ''',
         sources,
-        containingDescription: RootDescription('.'),
+        containingDescription: ResolvedRootDescription.fromDir('.'),
       );
 
       final foo = pubspec.devDependencies['foo']!;
@@ -167,7 +167,7 @@ dev_dependencies:
 dev_dependencies:
 ''',
         sources,
-        containingDescription: RootDescription('.'),
+        containingDescription: ResolvedRootDescription.fromDir('.'),
       );
 
       expect(pubspec.devDependencies, isEmpty);
@@ -184,7 +184,7 @@ dependency_overrides:
     version: ">=1.2.3 <3.4.5"
 ''',
         sources,
-        containingDescription: RootDescription('.'),
+        containingDescription: ResolvedRootDescription.fromDir('.'),
       );
 
       final foo = pubspec.dependencyOverrides['foo']!;
@@ -200,7 +200,7 @@ dependency_overrides:
 dependency_overrides:
 ''',
         sources,
-        containingDescription: RootDescription('.'),
+        containingDescription: ResolvedRootDescription.fromDir('.'),
       );
 
       expect(pubspec.dependencyOverrides, isEmpty);
@@ -214,7 +214,7 @@ dependencies:
     unknown: blah
 ''',
         sources,
-        containingDescription: RootDescription('.'),
+        containingDescription: ResolvedRootDescription.fromDir('.'),
       );
 
       final foo = pubspec.dependencies['foo']!;
@@ -230,7 +230,7 @@ dependencies:
     version: 1.2.3
 ''',
         sources,
-        containingDescription: RootDescription('.'),
+        containingDescription: ResolvedRootDescription.fromDir('.'),
       );
 
       final foo = pubspec.dependencies['foo']!;
@@ -239,77 +239,59 @@ dependencies:
     });
 
     test('throws if it depends on itself', () {
-      expectPubspecException(
-        '''
+      expectPubspecException('''
 name: myapp
 dependencies:
   myapp:
     fake: ok
-''',
-        (pubspec) => pubspec.dependencies,
-      );
+''', (pubspec) => pubspec.dependencies);
     });
 
     test('throws if it has a dev dependency on itself', () {
-      expectPubspecException(
-        '''
+      expectPubspecException('''
 name: myapp
 dev_dependencies:
   myapp:
     fake: ok
-''',
-        (pubspec) => pubspec.devDependencies,
-      );
+''', (pubspec) => pubspec.devDependencies);
     });
 
     test('throws if it has an override on itself', () {
-      expectPubspecException(
-        '''
+      expectPubspecException('''
 name: myapp
 dependency_overrides:
   myapp:
     fake: ok
-''',
-        (pubspec) => pubspec.dependencyOverrides,
-      );
+''', (pubspec) => pubspec.dependencyOverrides);
     });
 
     test("throws if the description isn't valid", () {
-      expectPubspecException(
-        '''
+      expectPubspecException('''
 name: myapp
 dependencies:
   foo:
     hosted:
       name: foo
       url: '::'
-''',
-        (pubspec) => pubspec.dependencies,
-      );
+''', (pubspec) => pubspec.dependencies);
     });
 
     test('throws if dependency version is not a string', () {
-      expectPubspecException(
-        '''
+      expectPubspecException('''
 dependencies:
   foo:
     fake: ok
     version: 1.2
-''',
-        (pubspec) => pubspec.dependencies,
-      );
+''', (pubspec) => pubspec.dependencies);
     });
 
     test('throws if version is not a version constraint', () {
-      expectPubspecException(
-        '''
+      expectPubspecException('''
 dependencies:
   foo:
     fake: ok
     version: not constraint
-''',
-        (pubspec) => pubspec.dependencies,
-      );
+''', (pubspec) => pubspec.dependencies);
     });
 
     test("throws if 'name' is not a string", () {
@@ -363,7 +345,7 @@ environment:
 workspace: ['a', 'b', 'c']
 ''',
           sources,
-          containingDescription: RootDescription('.'),
+          containingDescription: ResolvedRootDescription.fromDir('.'),
         ).workspace,
         ['a', 'b', 'c'],
       );
@@ -378,7 +360,7 @@ environment:
 resolution: workspace
 ''',
           sources,
-          containingDescription: RootDescription('.'),
+          containingDescription: ResolvedRootDescription.fromDir('.'),
         ).resolution,
         Resolution.workspace,
       );
@@ -392,7 +374,8 @@ environment:
 workspace: ['a', 'b', 'c']
 ''',
         (p) => p.workspace,
-        expectedContains: '`workspace` and `resolution` '
+        expectedContains:
+            '`workspace` and `resolution` '
             'requires at least language version 3.5',
         hintContains: '''
 Consider updating the SDK constraint to:
@@ -411,7 +394,7 @@ environment:
 resolution: workspace
 ''',
           sources,
-          containingDescription: RootDescription('.'),
+          containingDescription: ResolvedRootDescription.fromDir('.'),
         ).name,
         'foo',
       );
@@ -425,7 +408,8 @@ environment:
 resolution: workspace
 ''',
         (p) => p.resolution,
-        expectedContains: '`workspace` and `resolution` '
+        expectedContains:
+            '`workspace` and `resolution` '
             'requires at least language version 3.5',
         hintContains: '''
 Consider updating the SDK constraint to:
@@ -437,35 +421,26 @@ environment:
     });
 
     test('throws if workspace is not a list', () {
-      expectPubspecException(
-        '''
+      expectPubspecException('''
 environment:
   sdk: ^3.5.0
 workspace: 'a string'
-''',
-        (pubspec) => pubspec.workspace,
-      );
+''', (pubspec) => pubspec.workspace);
     });
 
     test('throws if workspace is a list of not-strings', () {
-      expectPubspecException(
-        '''
+      expectPubspecException('''
 environment:
   sdk: ^3.5.0
 workspace: ['a string', 24]
-''',
-        (pubspec) => pubspec.workspace,
-      );
+''', (pubspec) => pubspec.workspace);
     });
 
     test('throws if resolution is not a reasonable string', () {
-      expectPubspecException(
-        '''
+      expectPubspecException('''
 environment:
   sdk: ^3.5.0
-resolution: "sometimes"''',
-        (pubspec) => pubspec.resolution,
-      );
+resolution: "sometimes"''', (pubspec) => pubspec.resolution);
     });
 
     test('allows comment-only files', () {
@@ -477,7 +452,7 @@ resolution: "sometimes"''',
 # See https://dart.dev/tools/pub/cmd for details
 ''',
         sources,
-        containingDescription: RootDescription('.'),
+        containingDescription: ResolvedRootDescription.fromDir('.'),
       );
       expect(pubspec.version, equals(Version.none));
       expect(pubspec.dependencies, isEmpty);
@@ -490,13 +465,15 @@ name: pkg
 dependencies:
   from_path: {path: non_local_path}
 ''',
-        containingDescription: HostedDescription('foo', 'https://pub.dev'),
+        containingDescription: ResolvedHostedDescription(
+          HostedDescription('foo', 'https://pub.dev'),
+          sha256: null,
+        ),
         (pubspec) => pubspec.dependencies,
         expectedContains:
             'Invalid description in the "pkg" pubspec on the "from_path" '
-            'dependency: "non_local_path" is a relative path, '
-            'but this isn\'t a '
-            'local pubspec.',
+            'dependency: "non_local_path" is a path, but '
+            'this isn\'t a local pubspec.',
       );
     });
 
@@ -512,21 +489,19 @@ dependencies:
       name: bar
 ''',
           sources,
-          containingDescription: RootDescription('.'),
+          containingDescription: ResolvedRootDescription.fromDir('.'),
         );
 
         final foo = pubspec.dependencies['foo']!;
         expect(foo.name, equals('foo'));
         expect(foo.source.name, 'hosted');
         expect(
-            ResolvedHostedDescription(
-              foo.description as HostedDescription,
-              sha256: null,
-            ).serializeForLockfile(containingDir: null),
-            {
-              'url': 'https://example.org/pub/',
-              'name': 'bar',
-            });
+          ResolvedHostedDescription(
+            foo.description as HostedDescription,
+            sha256: null,
+          ).serializeForLockfile(containingDir: null),
+          {'url': 'https://example.org/pub/', 'name': 'bar'},
+        );
       });
 
       test('with url only', () {
@@ -541,21 +516,19 @@ dependencies:
       url: https://example.org/pub/
 ''',
           sources,
-          containingDescription: RootDescription('.'),
+          containingDescription: ResolvedRootDescription.fromDir('.'),
         );
 
         final foo = pubspec.dependencies['foo']!;
         expect(foo.name, equals('foo'));
         expect(foo.source.name, 'hosted');
         expect(
-            ResolvedHostedDescription(
-              foo.description as HostedDescription,
-              sha256: null,
-            ).serializeForLockfile(containingDir: null),
-            {
-              'url': 'https://example.org/pub/',
-              'name': 'foo',
-            });
+          ResolvedHostedDescription(
+            foo.description as HostedDescription,
+            sha256: null,
+          ).serializeForLockfile(containingDir: null),
+          {'url': 'https://example.org/pub/', 'name': 'foo'},
+        );
       });
 
       test('with url as string', () {
@@ -569,21 +542,19 @@ dependencies:
     hosted: https://example.org/pub/
 ''',
           sources,
-          containingDescription: RootDescription('.'),
+          containingDescription: ResolvedRootDescription.fromDir('.'),
         );
 
         final foo = pubspec.dependencies['foo']!;
         expect(foo.name, equals('foo'));
         expect(foo.source.name, 'hosted');
         expect(
-            ResolvedHostedDescription(
-              foo.description as HostedDescription,
-              sha256: null,
-            ).serializeForLockfile(containingDir: null),
-            {
-              'url': 'https://example.org/pub/',
-              'name': 'foo',
-            });
+          ResolvedHostedDescription(
+            foo.description as HostedDescription,
+            sha256: null,
+          ).serializeForLockfile(containingDir: null),
+          {'url': 'https://example.org/pub/', 'name': 'foo'},
+        );
       });
 
       test('interprets string description as name for older versions', () {
@@ -597,21 +568,19 @@ dependencies:
     hosted: bar
 ''',
           sources,
-          containingDescription: RootDescription('.'),
+          containingDescription: ResolvedRootDescription.fromDir('.'),
         );
 
         final foo = pubspec.dependencies['foo']!;
         expect(foo.name, equals('foo'));
         expect(foo.source.name, 'hosted');
         expect(
-            ResolvedHostedDescription(
-              foo.description as HostedDescription,
-              sha256: null,
-            ).serializeForLockfile(containingDir: null),
-            {
-              'url': 'https://pub.dev',
-              'name': 'bar',
-            });
+          ResolvedHostedDescription(
+            foo.description as HostedDescription,
+            sha256: null,
+          ).serializeForLockfile(containingDir: null),
+          {'url': 'https://pub.dev', 'name': 'bar'},
+        );
       });
 
       test(
@@ -627,14 +596,17 @@ dependencies:
     hosted: https://example.org/pub/
 ''',
             sources,
-            containingDescription: RootDescription('.'),
+            containingDescription: ResolvedRootDescription.fromDir('.'),
           );
 
           expect(
             () => pubspec.dependencies,
             throwsA(
-              isA<SourceSpanApplicationException>()
-                  .having((e) => e.span!.text, 'span.text', 'invalid value'),
+              isA<SourceSpanApplicationException>().having(
+                (e) => e.span!.text,
+                'span.text',
+                'invalid value',
+              ),
             ),
           );
         },
@@ -648,21 +620,19 @@ dependencies:
   foo:
 ''',
           sources,
-          containingDescription: RootDescription('.'),
+          containingDescription: ResolvedRootDescription.fromDir('.'),
         );
 
         final foo = pubspec.dependencies['foo']!;
         expect(foo.name, equals('foo'));
         expect(foo.source.name, 'hosted');
         expect(
-            ResolvedHostedDescription(
-              foo.description as HostedDescription,
-              sha256: null,
-            ).serializeForLockfile(containingDir: null),
-            {
-              'url': 'https://pub.dev',
-              'name': 'foo',
-            });
+          ResolvedHostedDescription(
+            foo.description as HostedDescription,
+            sha256: null,
+          ).serializeForLockfile(containingDir: null),
+          {'url': 'https://pub.dev', 'name': 'foo'},
+        );
       });
 
       group('throws without a min SDK constraint', () {
@@ -676,7 +646,8 @@ dependencies:
       url: https://example.org/pub/
 ''',
             (pubspec) => pubspec.dependencies,
-            expectedContains: "The 'name' key must have a "
+            expectedContains:
+                "The 'name' key must have a "
                 'string value without a minimum Dart '
                 'SDK constraint of 2.15.',
           );
@@ -693,7 +664,8 @@ dependencies:
     hosted: http://pub.example.org
 ''',
               (pubspec) => pubspec.dependencies,
-              expectedContains: 'Using `hosted: <url>` is only supported '
+              expectedContains:
+                  'Using `hosted: <url>` is only supported '
                   'with a minimum SDK constraint of 2.15.',
             );
           },
@@ -703,53 +675,41 @@ dependencies:
 
     group('git dependencies', () {
       test('path must be a string', () {
-        expectPubspecException(
-          '''
+        expectPubspecException('''
 dependencies:
   foo:
     git:
       url: git://github.com/dart-lang/foo
       path: 12
-''',
-          (pubspec) => pubspec.dependencies,
-        );
+''', (pubspec) => pubspec.dependencies);
       });
 
       test('path must be relative', () {
-        expectPubspecException(
-          '''
+        expectPubspecException('''
 dependencies:
   foo:
     git:
       url: git://github.com/dart-lang/foo
       path: git://github.com/dart-lang/foo/bar
-''',
-          (pubspec) => pubspec.dependencies,
-        );
+''', (pubspec) => pubspec.dependencies);
 
-        expectPubspecException(
-          '''
+        expectPubspecException('''
 dependencies:
   foo:
     git:
       url: git://github.com/dart-lang/foo
       path: /foo
-''',
-          (pubspec) => pubspec.dependencies,
-        );
+''', (pubspec) => pubspec.dependencies);
       });
 
       test('path must be within the repository', () {
-        expectPubspecException(
-          '''
+        expectPubspecException('''
 dependencies:
   foo:
     git:
       url: git://github.com/dart-lang/foo
       path: foo/../../bar
-''',
-          (pubspec) => pubspec.dependencies,
-        );
+''', (pubspec) => pubspec.dependencies);
       });
     });
 
@@ -758,7 +718,7 @@ dependencies:
         final pubspec = Pubspec.parse(
           'name: testing',
           sources,
-          containingDescription: RootDescription('.'),
+          containingDescription: ResolvedRootDescription.fromDir('.'),
         );
         expect(
           pubspec.dartSdkConstraint.effectiveConstraint,
@@ -773,7 +733,7 @@ dependencies:
         final pubspec = Pubspec.parse(
           '',
           sources,
-          containingDescription: RootDescription('.'),
+          containingDescription: ResolvedRootDescription.fromDir('.'),
         );
         expect(
           pubspec.dartSdkConstraint.effectiveConstraint,
@@ -791,7 +751,7 @@ dependencies:
     sdk: ">1.0.0"
   ''',
           sources,
-          containingDescription: RootDescription('.'),
+          containingDescription: ResolvedRootDescription.fromDir('.'),
         );
         expect(
           pubspec.dartSdkConstraint.effectiveConstraint,
@@ -801,8 +761,7 @@ dependencies:
         expect(pubspec.sdkConstraints, isNot(contains('fuchsia')));
       });
 
-      test(
-          'default upper constraint for the SDK applies only if compatible '
+      test('default upper constraint for the SDK applies only if compatible '
           'with the lower bound', () {
         final pubspec = Pubspec.parse(
           '''
@@ -810,7 +769,7 @@ dependencies:
     sdk: ">3.0.0"
   ''',
           sources,
-          containingDescription: RootDescription('.'),
+          containingDescription: ResolvedRootDescription.fromDir('.'),
         );
         expect(
           pubspec.sdkConstraints,
@@ -834,28 +793,25 @@ dependencies:
         final pubspec = Pubspec.parse(
           '''
 environment:
-  sdk: ">=1.2.3 <2.3.4"
+  sdk: ">=3.10.3 <3.11.4"
   flutter: ^0.1.2
   fuchsia: ^5.6.7
 ''',
           sources,
-          containingDescription: RootDescription('.'),
+          containingDescription: ResolvedRootDescription.fromDir('.'),
         );
         expect(
           pubspec.sdkConstraints,
           containsPair(
             'dart',
-            SdkConstraint(VersionConstraint.parse('>=1.2.3 <2.3.4')),
+            SdkConstraint(VersionConstraint.parse('>=3.10.3 <3.11.4')),
           ),
         );
         expect(
           pubspec.sdkConstraints,
           containsPair(
             'flutter',
-            SdkConstraint(
-              VersionConstraint.parse('>=0.1.2'),
-              originalConstraint: VersionConstraint.parse('^0.1.2'),
-            ),
+            SdkConstraint(VersionConstraint.parse('^0.1.2')),
           ),
         );
         expect(
@@ -903,7 +859,7 @@ environment:
         final pubspec = Pubspec.parse(
           '',
           sources,
-          containingDescription: RootDescription('.'),
+          containingDescription: ResolvedRootDescription.fromDir('.'),
         );
         expect(pubspec.publishTo, isNull);
       });
@@ -921,7 +877,7 @@ environment:
 publish_to: http://example.com
 ''',
           sources,
-          containingDescription: RootDescription('.'),
+          containingDescription: ResolvedRootDescription.fromDir('.'),
         );
         expect(pubspec.publishTo, equals('http://example.com'));
       });
@@ -932,7 +888,7 @@ publish_to: http://example.com
 publish_to: none
 ''',
           sources,
-          containingDescription: RootDescription('.'),
+          containingDescription: ResolvedRootDescription.fromDir('.'),
         );
         expect(pubspec.publishTo, equals('none'));
       });
@@ -957,7 +913,7 @@ publish_to: none
         final pubspec = Pubspec.parse(
           '',
           sources,
-          containingDescription: RootDescription('.'),
+          containingDescription: ResolvedRootDescription.fromDir('.'),
         );
         expect(pubspec.executables, isEmpty);
       });
@@ -969,7 +925,7 @@ executables:
   abcDEF-123_: "abc DEF-123._"
 ''',
           sources,
-          containingDescription: RootDescription('.'),
+          containingDescription: ResolvedRootDescription.fromDir('.'),
         );
         expect(pubspec.executables['abcDEF-123_'], equals('abc DEF-123._'));
       });
@@ -1023,7 +979,7 @@ executables:
   command:
 ''',
           sources,
-          containingDescription: RootDescription('.'),
+          containingDescription: ResolvedRootDescription.fromDir('.'),
         );
         expect(pubspec.executables['command'], equals('command'));
       });
@@ -1042,7 +998,7 @@ dependency_overrides:
           sources,
           overridesFileContents: overridesContents,
           overridesLocation: Uri.parse('file:///pubspec_overrides.yaml'),
-          containingDescription: RootDescription('.'),
+          containingDescription: ResolvedRootDescription.fromDir('.'),
         );
       }
 
@@ -1060,13 +1016,10 @@ dependency_overrides:
           );
         }
 
-        expect(
-          () {
-            final pubspec = parsePubspecOverrides(contents);
-            fn(pubspec);
-          },
-          throwsA(expectation),
-        );
+        expect(() {
+          final pubspec = parsePubspecOverrides(contents);
+          fn(pubspec);
+        }, throwsA(expectation));
       }
 
       test('allows empty overrides file', () {
@@ -1116,25 +1069,18 @@ dependency_overrides:
       });
 
       test('throws if overrides contain invalid dependency section', () {
-        expectPubspecOverridesException(
-          '''
+        expectPubspecOverridesException('''
 dependency_overrides: false
-''',
-          (pubspecOverrides) => pubspecOverrides.dependencyOverrides,
-        );
+''', (pubspecOverrides) => pubspecOverrides.dependencyOverrides);
       });
 
       test('throws if overrides contain an unknown field', () {
-        expectPubspecOverridesException(
-          '''
+        expectPubspecOverridesException('''
 name: 'foo'
-''',
-          (pubspecOverrides) => pubspecOverrides.dependencyOverrides,
-        );
+''', (pubspecOverrides) => pubspecOverrides.dependencyOverrides);
       });
     });
-    test(
-        'Throws after language 3.7 '
+    test('Throws after language 3.7 '
         'if using unknown keys in dependency description', () {
       expectPubspecException(
         '''

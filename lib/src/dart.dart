@@ -12,7 +12,7 @@ import 'package:analyzer/dart/analysis/analysis_context_collection.dart';
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/analysis/session.dart';
 import 'package:analyzer/dart/ast/ast.dart';
-import 'package:analyzer/error/error.dart';
+import 'package:analyzer/diagnostic/diagnostic.dart';
 import 'package:frontend_server_client/frontend_server_client.dart';
 import 'package:path/path.dart' as p;
 
@@ -27,14 +27,15 @@ class AnalysisContextManager {
   final AnalysisSession _session;
 
   factory AnalysisContextManager(String packagePath) => sessions.putIfAbsent(
-        packagePath,
-        () => AnalysisContextManager._(packagePath),
-      );
+    packagePath,
+    () => AnalysisContextManager._(packagePath),
+  );
 
   AnalysisContextManager._(this.packagePath)
-      : _session = AnalysisContextCollection(
-          includedPaths: [packagePath],
-        ).contextFor(packagePath).currentSession;
+    : _session =
+          AnalysisContextCollection(
+            includedPaths: [packagePath],
+          ).contextFor(packagePath).currentSession;
 
   /// Parse the file with the given [path] into AST.
   ///
@@ -70,9 +71,9 @@ class AnalysisContextManager {
   }
 }
 
-/// An error class that contains multiple [AnalysisError]s.
+/// An error class that contains multiple [Diagnostic]s.
 class AnalyzerErrorGroup implements Exception {
-  final List<AnalysisError> errors;
+  final List<Diagnostic> errors;
 
   AnalyzerErrorGroup(this.errors);
 
@@ -123,8 +124,10 @@ Future<void> precompile({
     tempDir = createTempDir(p.dirname(outputPath), 'tmp');
     // To avoid potential races we copy the incremental data to a temporary file
     // for just this compilation.
-    final temporaryIncrementalDill =
-        p.join(tempDir, '${p.basename(incrementalDillPath)}.temp');
+    final temporaryIncrementalDill = p.join(
+      tempDir,
+      '${p.basename(incrementalDillPath)}.temp',
+    );
     try {
       if (fileExists(outputPath)) {
         copyFile(outputPath, temporaryIncrementalDill);

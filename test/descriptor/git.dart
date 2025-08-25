@@ -18,11 +18,7 @@ class GitRepoDescriptor extends DirectoryDescriptor {
     await super.create(parent);
     await _runGitCommands(parent, [
       ['init'],
-      [
-        'config',
-        'core.excludesfile',
-        '',
-      ],
+      ['config', 'core.excludesfile', ''],
       ['add', '.'],
       ['commit', '-m', 'initial commit', '--allow-empty'],
     ]);
@@ -37,6 +33,15 @@ class GitRepoDescriptor extends DirectoryDescriptor {
     await _runGitCommands(parent, [
       ['add', '.'],
       ['commit', '-m', 'update'],
+    ]);
+  }
+
+  /// Adds a tag named [tag] to the repo described by `this`.
+  ///
+  /// [parent] defaults to [sandbox].
+  Future tag(String tag, [String? parent]) async {
+    await _runGitCommands(parent, [
+      ['tag', '-a', tag, '-m', 'Some message'],
     ]);
   }
 
@@ -64,8 +69,8 @@ class GitRepoDescriptor extends DirectoryDescriptor {
       'GIT_COMMITTER_NAME': 'Pub Test',
       'GIT_COMMITTER_EMAIL': 'pub@dartlang.org',
       // To make stable commits ids we fix the date.
-      'GIT_COMMITTER_DATE': DateTime(1970).toIso8601String(),
-      'GIT_AUTHOR_DATE': DateTime(1970).toIso8601String(),
+      'GIT_COMMITTER_DATE': DateTime.utc(1970).toIso8601String(),
+      'GIT_AUTHOR_DATE': DateTime.utc(1970).toIso8601String(),
     };
 
     return git.run(

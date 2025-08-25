@@ -19,11 +19,6 @@ class PackageConfig {
   /// Packages configured.
   List<PackageConfigEntry> packages;
 
-  /// Date-time the `.dart_tool/package_config.json` file was generated.
-  ///
-  /// `null` if not given.
-  DateTime? generated;
-
   /// Tool that generated the `.dart_tool/package_config.json` file.
   ///
   /// For `pub` this is always `'pub'`.
@@ -46,7 +41,6 @@ class PackageConfig {
   PackageConfig({
     required this.configVersion,
     required this.packages,
-    this.generated,
     this.generator,
     this.generatorVersion,
     Map<String, dynamic>? additionalProperties,
@@ -98,16 +92,6 @@ class PackageConfig {
       packages.add(PackageConfigEntry.fromJson(entry as Object));
     }
 
-    // Read the 'generated' property
-    DateTime? generated;
-    final generatedRaw = root['generated'];
-    if (generatedRaw != null) {
-      if (generatedRaw is! String) {
-        throwFormatException('generated', 'must be a string, if given');
-      }
-      generated = DateTime.parse(generatedRaw);
-    }
-
     // Read the 'generator' property
     final generator = root['generator'];
     if (generator is! String?) {
@@ -136,18 +120,18 @@ class PackageConfig {
     return PackageConfig(
       configVersion: configVersion,
       packages: packages,
-      generated: generated,
       generator: generator,
       generatorVersion: generatorVersion,
       additionalProperties: Map.fromEntries(
         root.entries.where(
-          (e) => !{
-            'configVersion',
-            'packages',
-            'generated',
-            'generator',
-            'generatorVersion',
-          }.contains(e.key),
+          (e) =>
+              !{
+                'configVersion',
+                'packages',
+                'generated',
+                'generator',
+                'generatorVersion',
+              }.contains(e.key),
         ),
       ),
     );
@@ -155,27 +139,12 @@ class PackageConfig {
 
   /// Convert to JSON structure.
   Map<String, Object?> toJson() => {
-        'configVersion': configVersion,
-        'packages': packages.map((p) => p.toJson()).toList(),
-        'generated': generated?.toUtc().toIso8601String(),
-        'generator': generator,
-        'generatorVersion': generatorVersion?.toString(),
-      }..addAll(additionalProperties);
-
-  // We allow the package called 'flutter_gen' to be injected into
-  // package_config.
-  //
-  // This is somewhat a hack. But it allows flutter to generate code in a
-  // package as it likes.
-  //
-  // See https://github.com/flutter/flutter/issues/73870 .
-  Iterable<PackageConfigEntry> get nonInjectedPackages =>
-      packages.where((package) => !_isInjectedFlutterGenPackage(package));
+    'configVersion': configVersion,
+    'packages': packages.map((p) => p.toJson()).toList(),
+    'generator': generator,
+    'generatorVersion': generatorVersion?.toString(),
+  }..addAll(additionalProperties);
 }
-
-bool _isInjectedFlutterGenPackage(PackageConfigEntry package) =>
-    package.name == 'flutter_gen' &&
-    package.rootUri.toString() == 'flutter_gen';
 
 class PackageConfigEntry {
   /// Package name.
@@ -289,11 +258,11 @@ class PackageConfigEntry {
 
   /// Convert to JSON structure.
   Map<String, Object?> toJson() => {
-        'name': name,
-        'rootUri': rootUri.toString(),
-        if (packageUri != null) 'packageUri': packageUri.toString(),
-        if (languageVersion != null) 'languageVersion': '$languageVersion',
-      }..addAll(additionalProperties ?? {});
+    'name': name,
+    'rootUri': rootUri.toString(),
+    if (packageUri != null) 'packageUri': packageUri.toString(),
+    if (languageVersion != null) 'languageVersion': '$languageVersion',
+  }..addAll(additionalProperties ?? {});
 
   @override
   String toString() {

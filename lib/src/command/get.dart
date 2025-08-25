@@ -37,7 +37,8 @@ class GetCommand extends PubCommand {
     argParser.addFlag(
       'enforce-lockfile',
       negatable: false,
-      help: 'Enforce pubspec.lock. '
+      help:
+          'Enforce pubspec.lock. '
           'Fail `pub get` if the current `pubspec.lock` '
           'does not exactly specify a valid resolution of `pubspec.yaml` '
           'or if any content hash of a hosted package has changed.\n'
@@ -55,7 +56,6 @@ class GetCommand extends PubCommand {
       'example',
       defaultsTo: true,
       help: 'Also run in `example/` (if it exists).',
-      hide: true,
     );
 
     argParser.addOption(

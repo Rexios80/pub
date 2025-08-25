@@ -48,10 +48,7 @@ Future<void> expectValidationWarning(
 }) async {
   final s = count == 1 ? '' : 's';
   await expectValidation(
-    message: allOf([
-      contains(error),
-      contains('Package has $count warning$s'),
-    ]),
+    message: allOf([contains(error), contains('Package has $count warning$s')]),
     exitCode: DATA,
     environment: environment,
   );
@@ -61,14 +58,13 @@ Future<void> expectValidationHint(
   String hint, {
   int count = 1,
   Map<String, String> environment = const {},
+  String? workingDirectory,
 }) async {
   final s = count == 1 ? '' : 's';
   await expectValidation(
-    message: allOf([
-      contains(hint),
-      contains('and $count hint$s'),
-    ]),
+    message: allOf([contains(hint), contains('and $count hint$s')]),
     environment: environment,
+    workingDirectory: workingDirectory,
   );
 }
 

@@ -17,7 +17,6 @@ import '../package_name.dart';
 import '../pubspec.dart';
 import '../pubspec_utils.dart';
 import '../solver.dart';
-import '../source/hosted.dart';
 import '../utils.dart';
 
 /// Handles the `upgrade` pub command.
@@ -72,14 +71,16 @@ class UpgradeCommand extends PubCommand {
 
     argParser.addFlag(
       'unlock-transitive',
-      help: 'Also upgrades the transitive dependencies '
+      help:
+          'Also upgrades the transitive dependencies '
           'of the listed [dependencies]',
       negatable: false,
     );
 
     argParser.addFlag(
       'major-versions',
-      help: 'Upgrades packages to their latest resolvable versions, '
+      help:
+          'Upgrades packages to their latest resolvable versions, '
           'and updates pubspec.yaml.',
       negatable: false,
     );
@@ -88,7 +89,6 @@ class UpgradeCommand extends PubCommand {
       'example',
       defaultsTo: true,
       help: 'Also run in `example/` (if it exists).',
-      hide: true,
     );
 
     argParser.addOption(
@@ -120,8 +120,12 @@ class UpgradeCommand extends PubCommand {
       final graph = await entrypoint.packageGraph;
       return argResults.rest
           .expand(
-            (package) =>
-                graph.transitiveDependencies(package).map((p) => p.name),
+            (package) => graph
+                .transitiveDependencies(
+                  package,
+                  followDevDependenciesFromPackage: true,
+                )
+                .map((p) => p.name),
           )
           .toSet()
           .toList();
@@ -164,8 +168,9 @@ Consider using the Dart 2.19 sdk to migrate to null safety.''');
             'Running `upgrade --tighten` only in `${entrypoint.workspaceRoot.dir}`. Run `$topLevelProgram pub upgrade --tighten --directory example/` separately.',
           );
         }
-        final changes =
-            entrypoint.tighten(packagesToUpgrade: await _packagesToUpgrade);
+        final changes = entrypoint.tighten(
+          packagesToUpgrade: await _packagesToUpgrade,
+        );
         entrypoint.applyChanges(changes, _dryRun);
       }
     }
@@ -197,12 +202,14 @@ Consider using the Dart 2.19 sdk to migrate to null safety.''');
   Future<List<String>> _directDependenciesToUpgrade() async {
     assert(_upgradeMajorVersions);
 
-    final directDeps = {
-      for (final package in entrypoint.workspaceRoot.transitiveWorkspace) ...[
-        ...package.dependencies.keys,
-        ...package.devDependencies.keys,
-      ],
-    }.toList();
+    final directDeps =
+        {
+          for (final package
+              in entrypoint.workspaceRoot.transitiveWorkspace) ...[
+            ...package.dependencies.keys,
+            ...package.devDependencies.keys,
+          ],
+        }.toList();
     final packagesToUpgrade = await _packagesToUpgrade;
     final toUpgrade =
         packagesToUpgrade.isEmpty ? directDeps : packagesToUpgrade;
@@ -226,19 +233,15 @@ be direct 'dependencies' or 'dev_dependencies', following packages are not:
     // Solve [resolvablePubspec] in-memory and consolidate the resolved
     // versions of the packages into a map for quick searching.
     final resolvedPackages = <String, PackageId>{};
-    final solveResult = await log.spinner(
-      'Resolving dependencies',
-      () async {
-        return await resolveVersions(
-          SolveType.upgrade,
-          cache,
-          entrypoint.workspaceRoot.transformWorkspace(
-            (package) => stripVersionBounds(package.pubspec),
-          ),
-        );
-      },
-      condition: _shouldShowSpinner,
-    );
+    final solveResult = await log.spinner('Resolving dependencies', () async {
+      return await resolveVersions(
+        SolveType.upgrade,
+        cache,
+        entrypoint.workspaceRoot.transformWorkspace(
+          (package) => stripVersionBounds(package.pubspec),
+        ),
+      );
+    }, condition: _shouldShowSpinner);
     for (final resolvedPackage in solveResult.packages) {
       resolvedPackages[resolvedPackage.name] = resolvedPackage;
     }
@@ -247,11 +250,11 @@ be direct 'dependencies' or 'dev_dependencies', following packages are not:
     // Mapping from original to changed value.
     var changes = <Package, Map<PackageRange, PackageRange>>{};
     for (final package in entrypoint.workspaceRoot.transitiveWorkspace) {
-      final declaredHostedDependencies = [
+      final declaredUpgradableDependencies = [
         ...package.dependencies.values,
         ...package.devDependencies.values,
-      ].where((dep) => dep.source is HostedSource);
-      for (final dep in declaredHostedDependencies) {
+      ].where((dep) => dep.description.hasMultipleVersions);
+      for (final dep in declaredUpgradableDependencies) {
         final resolvedPackage = resolvedPackages[dep.name]!;
         if (!toUpgrade.contains(dep.name)) {
           // If we're not trying to upgrade this package, or it wasn't in the
@@ -260,8 +263,9 @@ be direct 'dependencies' or 'dev_dependencies', following packages are not:
         }
 
         // Skip [dep] if it has a dependency_override.
-        if (entrypoint.workspaceRoot.pubspec.dependencyOverrides
-            .containsKey(dep.name)) {
+        if (entrypoint.workspaceRoot.pubspec.dependencyOverrides.containsKey(
+          dep.name,
+        )) {
           dependencyOverriddenDeps.add(dep.name);
           continue;
         }
@@ -273,8 +277,8 @@ be direct 'dependencies' or 'dev_dependencies', following packages are not:
         }
 
         (changes[package] ??= {})[dep] = dep.toRef().withConstraint(
-              VersionConstraint.compatibleWith(resolvedPackage.version),
-            );
+          VersionConstraint.compatibleWith(resolvedPackage.version),
+        );
       }
     }
 
@@ -306,21 +310,24 @@ be direct 'dependencies' or 'dev_dependencies', following packages are not:
         (await _packagesToUpgrade).isEmpty ? SolveType.upgrade : SolveType.get;
 
     entrypoint.applyChanges(changes, _dryRun);
-    await entrypoint.withUpdatedRootPubspecs({
-      for (final MapEntry(key: package, value: changesForPackage)
-          in changes.entries)
-        package: applyChanges(package.pubspec, changesForPackage),
-    }).acquireDependencies(
-      solveType,
-      dryRun: _dryRun,
-      precompile: !_dryRun && _precompile,
-      unlock: await _packagesToUpgrade,
-    );
+    await entrypoint
+        .withUpdatedRootPubspecs({
+          for (final MapEntry(key: package, value: changesForPackage)
+              in changes.entries)
+            package: applyChanges(package.pubspec, changesForPackage),
+        })
+        .acquireDependencies(
+          solveType,
+          dryRun: _dryRun,
+          precompile: !_dryRun && _precompile,
+          unlock: await _packagesToUpgrade,
+        );
 
     // If any of the packages to upgrade are dependency overrides, then we
     // show a warning.
-    final toUpgradeOverrides = toUpgrade
-        .where(entrypoint.workspaceRoot.allOverridesInWorkspace.containsKey);
+    final toUpgradeOverrides = toUpgrade.where(
+      entrypoint.workspaceRoot.allOverridesInWorkspace.containsKey,
+    );
     if (toUpgradeOverrides.isNotEmpty) {
       log.warning(
         'Warning: dependency_overrides prevents upgrades for: '
@@ -353,8 +360,10 @@ be direct 'dependencies' or 'dev_dependencies', following packages are not:
 
   void _showOfflineWarning() {
     if (isOffline) {
-      log.warning('Warning: Upgrading when offline may not update you to the '
-          'latest versions of your dependencies.');
+      log.warning(
+        'Warning: Upgrading when offline may not update you to the '
+        'latest versions of your dependencies.',
+      );
     }
   }
 }

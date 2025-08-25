@@ -58,7 +58,7 @@ Make dependency overrides by prefixing with "override:".
 Add packages with specific constraints or other sources by giving a descriptor
 after a colon.
 
-For example:
+For example (follow the same format including spaces):
   * Add a hosted dependency at newest compatible stable version:
     `$topLevelProgram pub add foo`
   * Add a hosted dev dependency at newest compatible stable version:
@@ -67,19 +67,19 @@ For example:
     `$topLevelProgram pub add foo:^1.2.3`
   * Add multiple dependencies:
     `$topLevelProgram pub add foo dev:bar`
-  * Add a path dependency:
-    `$topLevelProgram pub add 'foo:{"path":"../foo"}'`
-  * Add a hosted dependency:
-    `$topLevelProgram pub add 'foo:{"hosted":"my-pub.dev"}'`
-  * Add an sdk dependency:
-    `$topLevelProgram pub add 'foo:{"sdk":"flutter"}'`
-  * Add a git dependency:
-    `$topLevelProgram pub add 'foo:{"git":"https://github.com/foo/foo"}'`
   * Add a dependency override:
-    `$topLevelProgram pub add 'override:foo:1.0.0'`
+    `$topLevelProgram pub add override:foo:1.0.0`
+  * Add a path dependency:
+    `$topLevelProgram pub add "foo:{path: ../foo}"`
+  * Add a hosted dependency:
+    `$topLevelProgram pub add "foo:{hosted: https://my-pub.dev}"`
+  * Add an sdk dependency:
+    `$topLevelProgram pub add "foo:{sdk: flutter}"`
+  * Add a git dependency:
+    `$topLevelProgram pub add "foo:{git: https://github.com/foo/foo}"`
   * Add a git dependency with a path and ref specified:
     `$topLevelProgram pub add \\
-      'foo:{"git":{"url":"../foo.git","ref":"<branch>","path":"<subdir>"}}'`''';
+      "foo:{git:{url: ../foo.git, ref: <branch>, path: <subdir>}}"`''';
 
   @override
   String get argumentsDescription =>
@@ -106,11 +106,7 @@ For example:
     // To avoid breaking changes we keep supporting them, but hide them from
     // --help to discourage further use. Combining these with new syntax will
     // fail.
-    argParser.addOption(
-      'git-url',
-      help: 'Git URL of the package',
-      hide: true,
-    );
+    argParser.addOption('git-url', help: 'Git URL of the package', hide: true);
     argParser.addOption(
       'git-ref',
       help: 'Git branch or commit to be retrieved',
@@ -119,6 +115,11 @@ For example:
     argParser.addOption(
       'git-path',
       help: 'Path of git package in repository',
+      hide: true,
+    );
+    argParser.addOption(
+      'git-tag-pattern',
+      help: 'The tag-pattern to search for versions in repository',
       hide: true,
     );
     argParser.addOption(
@@ -166,7 +167,6 @@ For example:
       defaultsTo: true,
       help:
           'Also update dependencies in `example/` after modifying pubspec.yaml in the root package (if it exists).',
-      hide: true,
     );
   }
 
@@ -203,7 +203,7 @@ Specify multiple sdk packages with descriptors.''');
       resolutionPubspec = await _addPackageToPubspec(resolutionPubspec, update);
     }
 
-    late SolveResult solveResult;
+    final SolveResult solveResult;
 
     try {
       /// Use [SolveType.UPGRADE] to solve for the highest version of [package]
@@ -218,8 +218,10 @@ Specify multiple sdk packages with descriptors.''');
       );
     } on GitException {
       final name = updates.first.ref.name;
-      dataError('Unable to resolve package "$name" with the given '
-          'git parameters.');
+      dataError(
+        'Unable to resolve package "$name" with the given '
+        'git parameters.',
+      );
     } on SolveFailure catch (e) {
       dataError(e.message);
     } on WrappedException catch (e) {
@@ -231,8 +233,9 @@ Specify multiple sdk packages with descriptors.''');
     for (final update in updates) {
       final ref = update.ref;
       final name = ref.name;
-      final resultPackage = solveResult.packages
-          .firstWhere((packageId) => packageId.name == name);
+      final resultPackage = solveResult.packages.firstWhere(
+        (packageId) => packageId.name == name,
+      );
 
       /// Assert that [resultPackage] is within the original user's
       /// expectations.
@@ -240,9 +243,11 @@ Specify multiple sdk packages with descriptors.''');
       if (constraint != null && !constraint.allows(resultPackage.version)) {
         final dependencyOverrides = resolutionPubspec.dependencyOverrides;
         if (dependencyOverrides.isNotEmpty) {
-          dataError('"$name" resolved to "${resultPackage.version}" which '
-              'does not satisfy constraint "$constraint". This could be '
-              'caused by "dependency_overrides".');
+          dataError(
+            '"$name" resolved to "${resultPackage.version}" which '
+            'does not satisfy constraint "$constraint". This could be '
+            'caused by "dependency_overrides".',
+          );
         }
       }
     }
@@ -274,7 +279,9 @@ Specify multiple sdk packages with descriptors.''');
             location: Uri.parse(entrypoint.workPackage.pubspecPath),
             overridesFileContents: overridesFileContents,
             overridesLocation: Uri.file(overridesPath),
-            containingDescription: RootDescription(entrypoint.workPackage.dir),
+            containingDescription: ResolvedRootDescription.fromDir(
+              entrypoint.workPackage.dir,
+            ),
           ),
         )
         .acquireDependencies(
@@ -294,8 +301,10 @@ Specify multiple sdk packages with descriptors.''');
     }
 
     if (isOffline) {
-      log.warning('Warning: Packages added when offline may not resolve to '
-          'the latest compatible version available.');
+      log.warning(
+        'Warning: Packages added when offline may not resolve to '
+        'the latest compatible version available.',
+      );
     }
   }
 
@@ -311,17 +320,21 @@ Specify multiple sdk packages with descriptors.''');
     final dependencyOverrides = [...original.dependencyOverrides.values];
 
     final dependencyNames = dependencies.map((dependency) => dependency.name);
-    final devDependencyNames =
-        devDependencies.map((devDependency) => devDependency.name);
-    final range =
-        package.ref.withConstraint(package.constraint ?? VersionConstraint.any);
+    final devDependencyNames = devDependencies.map(
+      (devDependency) => devDependency.name,
+    );
+    final range = package.ref.withConstraint(
+      package.constraint ?? VersionConstraint.any,
+    );
 
     if (package.isOverride) {
       dependencyOverrides.add(range);
     } else if (package.isDev) {
       if (devDependencyNames.contains(name)) {
-        log.message('"$name" is already in "dev_dependencies". '
-            'Will try to update the constraint.');
+        log.message(
+          '"$name" is already in "dev_dependencies". '
+          'Will try to update the constraint.',
+        );
         devDependencies.removeWhere((element) => element.name == name);
       }
 
@@ -330,9 +343,11 @@ Specify multiple sdk packages with descriptors.''');
       /// remove the package from dependencies, since it might cause the user's
       /// code to break.
       if (dependencyNames.contains(name)) {
-        dataError('"$name" is already in "dependencies". '
-            'Use "pub remove $name" to remove it before adding it '
-            'to "dev_dependencies"');
+        dataError(
+          '"$name" is already in "dependencies". '
+          'Use "pub remove $name" to remove it before adding it '
+          'to "dev_dependencies"',
+        );
       }
 
       devDependencies.add(range);
@@ -349,8 +364,10 @@ Specify multiple sdk packages with descriptors.''');
       /// dependencies, we remove the package from dev_dependencies, since it is
       /// now redundant.
       if (devDependencyNames.contains(name)) {
-        log.message('"$name" was found in dev_dependencies. '
-            'Removing "$name" and adding it to dependencies instead.');
+        log.message(
+          '"$name" was found in dev_dependencies. '
+          'Removing "$name" and adding it to dependencies instead.',
+        );
         devDependencies.removeWhere((element) => element.name == name);
       }
 
@@ -394,9 +411,10 @@ Specify multiple sdk packages with descriptors.''');
             'The only allowed prefixes are "dev:" and "override:"',
           );
         } else {
-          final packageName = match2.namedGroup('descriptor') == null
-              ? match2.namedGroup('prefix')
-              : match2.namedGroup('name');
+          final packageName =
+              match2.namedGroup('descriptor') == null
+                  ? match2.namedGroup('prefix')
+                  : match2.namedGroup('name');
           usageException('Not a valid package name: "$packageName"');
         }
       }
@@ -481,16 +499,18 @@ Specify multiple sdk packages with descriptors.''');
       ['sdk'],
     ];
 
-    for (final flag
-        in conflictingFlagSets.expand((s) => s).where(argResults.wasParsed)) {
+    for (final flag in conflictingFlagSets
+        .expand((s) => s)
+        .where(argResults.wasParsed)) {
       final conflictingFlag = conflictingFlagSets
           .where((s) => !s.contains(flag))
           .expand((s) => s)
           .firstWhereOrNull(argResults.wasParsed);
       if (conflictingFlag != null) {
         usageException(
-            'Packages can only have one source, "pub add" flags "--$flag" and '
-            '"--$conflictingFlag" are conflicting.');
+          'Packages can only have one source, "pub add" flags "--$flag" and '
+          '"--$conflictingFlag" are conflicting.',
+        );
       }
     }
 
@@ -520,12 +540,17 @@ Specify multiple sdk packages with descriptors.''');
     }
 
     /// The package to be added.
-    late final PackageRef ref;
+    final PackageRef ref;
     final path = argResults.path;
     if (argResults.hasGitOptions) {
       final gitUrl = argResults.gitUrl;
       if (gitUrl == null) {
         usageException('The `--git-url` is required for git dependencies.');
+      }
+      if (argResults.gitRef != null && argResults.tagPattern != null) {
+        usageException(
+          'Cannot provide both `--git-ref` and `--git-tag-pattern`.',
+        );
       }
 
       /// Process the git options to return the simplest representation to be
@@ -538,6 +563,7 @@ Specify multiple sdk packages with descriptors.''');
             containingDir: p.current,
             ref: argResults.gitRef,
             path: argResults.gitPath,
+            tagPattern: argResults.tagPattern,
           ),
         );
       } on FormatException catch (e) {
@@ -552,7 +578,7 @@ Specify multiple sdk packages with descriptors.''');
       ref = cache.sdk.parseRef(
         packageName,
         argResults.sdk,
-        containingDescription: RootDescription(p.current),
+        containingDescription: ResolvedRootDescription.fromDir(p.current),
       );
     } else {
       ref = PackageRef(
@@ -632,17 +658,13 @@ Specify multiple sdk packages with descriptors.''');
         try {
           dummyPubspec = Pubspec.fromMap(
             {
-              'dependencies': {
-                packageName: parsedDescriptor,
-              },
-              'environment': {
-                'sdk': sdk.version.toString(),
-              },
+              'dependencies': {packageName: parsedDescriptor},
+              'environment': {'sdk': sdk.version.toString()},
             },
             cache.sources,
             // Resolve relative paths relative to current, not where the
             // pubspec.yaml is.
-            containingDescription: RootDescription(p.current),
+            containingDescription: ResolvedRootDescription.fromDir(p.current),
           );
         } on FormatException catch (e) {
           usageException('Failed parsing package specification: ${e.message}');
@@ -654,7 +676,8 @@ Specify multiple sdk packages with descriptors.''');
         } else {
           ref = range.toRef();
         }
-        final hasExplicitConstraint = parsedDescriptor is String ||
+        final hasExplicitConstraint =
+            parsedDescriptor is String ||
             (parsedDescriptor is Map &&
                 parsedDescriptor.containsKey('version'));
         // If the descriptor has an explicit constraint, use that. Otherwise we
@@ -682,15 +705,17 @@ Specify multiple sdk packages with descriptors.''');
     List<PackageId> resultPackages,
     List<_ParseResult> updates,
   ) {
-    final yamlEditor =
-        YamlEditor(readTextFile(entrypoint.workPackage.pubspecPath));
+    final yamlEditor = YamlEditor(
+      readTextFile(entrypoint.workPackage.pubspecPath),
+    );
     log.io('Reading ${entrypoint.workPackage.pubspecPath}.');
     log.fine('Contents:\n$yamlEditor');
 
     for (final update in updates) {
-      final dependencyKey = update.isDev
-          ? 'dev_dependencies'
-          : (update.isOverride ? 'dependency_overrides' : 'dependencies');
+      final dependencyKey =
+          update.isDev
+              ? 'dev_dependencies'
+              : (update.isOverride ? 'dependency_overrides' : 'dependencies');
       final constraint = update.constraint;
       final ref = update.ref;
       final name = ref.name;
@@ -699,7 +724,7 @@ Specify multiple sdk packages with descriptors.''');
       final description = pubspecDescription(
         ref.withConstraint(
           constraint ??
-              (ref.source is HostedSource
+              (ref.description.hasMultipleVersions
                   ? VersionConstraint.compatibleWith(resultId.version)
                   : VersionConstraint.any),
         ),
@@ -707,19 +732,17 @@ Specify multiple sdk packages with descriptors.''');
         entrypoint.workPackage,
       );
 
-      if (yamlEditor.parseAt(
-            [dependencyKey],
-            orElse: () => YamlScalar.wrap(null),
-          ).value ==
+      if (yamlEditor.parseAt([
+            dependencyKey,
+          ], orElse: () => YamlScalar.wrap(null)).value ==
           null) {
         // Handle the case where [dependencyKey] does not already exist.
         // We ensure it is in Block-style by default.
         yamlEditor.update(
           [dependencyKey],
-          wrapAsYamlNode(
-            {name: description},
-            collectionStyle: CollectionStyle.BLOCK,
-          ),
+          wrapAsYamlNode({
+            name: description,
+          }, collectionStyle: CollectionStyle.BLOCK),
         );
       } else {
         final packagePath = [dependencyKey, name];
@@ -731,8 +754,9 @@ Specify multiple sdk packages with descriptors.''');
       /// dependencies. Refer to [_addPackageToPubspec] for additional
       /// discussion.
       if (!update.isDev && !update.isOverride) {
-        final devDependenciesNode = yamlEditor
-            .parseAt(['dev_dependencies'], orElse: () => YamlScalar.wrap(null));
+        final devDependenciesNode = yamlEditor.parseAt([
+          'dev_dependencies',
+        ], orElse: () => YamlScalar.wrap(null));
 
         if (devDependenciesNode is YamlMap &&
             devDependenciesNode.containsKey(name)) {
@@ -775,6 +799,8 @@ extension on ArgResults {
   bool get isDryRun => flag('dry-run');
   String? get gitUrl => this['git-url'] as String?;
   String? get gitPath => this['git-path'] as String?;
+  String? get tagPattern => this['git-tag-pattern'] as String?;
+
   String? get gitRef => this['git-ref'] as String?;
   String? get hostedUrl => this['hosted-url'] as String?;
   String? get path => this['path'] as String?;

@@ -29,7 +29,7 @@ class SdkSource extends Source {
   PackageRef parseRef(
     String name,
     Object? description, {
-    required Description containingDescription,
+    required ResolvedDescription containingDescription,
     LanguageVersion? languageVersion,
   }) {
     if (description is! String) {
@@ -79,10 +79,7 @@ class SdkSource extends Source {
   }
 
   @override
-  Future<Pubspec> doDescribe(
-    PackageId id,
-    SystemCache cache,
-  ) async =>
+  Future<Pubspec> doDescribe(PackageId id, SystemCache cache) async =>
       _loadPubspec(id.toRef(), cache);
 
   /// Loads the pubspec for the SDK package named [ref].
@@ -94,14 +91,17 @@ class SdkSource extends Source {
       _verifiedPackagePath(ref),
       cache.sources,
       expectedName: ref.name,
-      containingDescription: ref.description,
+      containingDescription: ResolvedSdkDescription(
+        ref.description as SdkDescription,
+      ),
     );
 
     /// Validate that there are no non-sdk dependencies if the SDK does not
     /// allow them.
     if (ref.description case final SdkDescription description) {
-      if (sdks[description.sdk]
-          case Sdk(allowsNonSdkDepsInSdkPackages: false)) {
+      if (sdks[description.sdk] case Sdk(
+        allowsNonSdkDepsInSdkPackages: false,
+      )) {
         for (var dep in pubspec.dependencies.entries) {
           if (dep.value.source is! SdkSource) {
             throw UnsupportedError(
@@ -188,6 +188,9 @@ class SdkDescription extends Description {
   bool operator ==(Object other) {
     return other is SdkDescription && other.sdk == sdk;
   }
+
+  @override
+  bool get hasMultipleVersions => false;
 }
 
 class ResolvedSdkDescription extends ResolvedDescription {

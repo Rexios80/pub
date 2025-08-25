@@ -2,8 +2,10 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 import 'package:pub_semver/pub_semver.dart';
 
@@ -38,39 +40,39 @@ class SystemCache {
 
   String get tempDir => p.join(rootDir, '_temp');
 
-  static String defaultDir = (() {
-    final envCache = Platform.environment['PUB_CACHE'];
-    if (envCache != null) {
-      return envCache;
-    } else if (Platform.isWindows) {
-      // %LOCALAPPDATA% is used as the cache location over %APPDATA%, because
-      // the latter is synchronised between devices when the user roams between
-      // them, whereas the former is not.
-      final localAppData = Platform.environment['LOCALAPPDATA'];
-      if (localAppData == null) {
-        dataError('''
+  static String defaultDir =
+      (() {
+        final envCache = Platform.environment['PUB_CACHE'];
+        if (envCache != null) {
+          return envCache;
+        } else if (Platform.isWindows) {
+          // %LOCALAPPDATA% is used as the cache location over %APPDATA%,
+          // because the latter is synchronised between devices when the user
+          // roams between them, whereas the former is not.
+          final localAppData = Platform.environment['LOCALAPPDATA'];
+          if (localAppData == null) {
+            dataError('''
 Could not find the pub cache. No `LOCALAPPDATA` environment variable exists.
 Consider setting the `PUB_CACHE` variable manually.
 ''');
-      }
-      return p.join(localAppData, 'Pub', 'Cache');
-    } else {
-      final home = Platform.environment['HOME'];
-      if (home == null) {
-        dataError('''
+          }
+          return p.join(localAppData, 'Pub', 'Cache');
+        } else {
+          final home = Platform.environment['HOME'];
+          if (home == null) {
+            dataError('''
 Could not find the pub cache. No `HOME` environment variable exists.
 Consider setting the `PUB_CACHE` variable manually.
 ''');
-      }
-      return p.join(home, '.pub-cache');
-    }
-  })();
+          }
+          return p.join(home, '.pub-cache');
+        }
+      })();
 
   /// The available sources.
-  late final _sources = Map<String, Source>.fromIterable(
-    [hosted, git, path, sdk],
-    key: (source) => (source as Source).name,
-  );
+  late final _sources = {
+    for (final source in [hosted, git, path, sdk]) source.name: source,
+  };
 
   Source sources(String? name) {
     return name == null
@@ -79,6 +81,8 @@ Consider setting the `PUB_CACHE` variable manually.
   }
 
   Source get defaultSource => hosted;
+
+  late final Iterable<CachedSource> cachedSources = [hosted, git];
 
   /// The built-in Git source.
   GitSource get git => GitSource.instance;
@@ -105,8 +109,8 @@ Consider setting the `PUB_CACHE` variable manually.
   /// If [isOffline] is `true`, then the offline hosted source will be used.
   /// Defaults to `false`.
   SystemCache({String? rootDir, this.isOffline = false})
-      : _rootDir = rootDir,
-        tokenStore = TokenStore(dartConfigDir);
+    : _rootDir = rootDir,
+      tokenStore = TokenStore(dartConfigDir);
 
   /// Loads the package identified by [id].
   ///
@@ -179,23 +183,22 @@ Consider setting the `PUB_CACHE` variable manually.
   }) async {
     var versions = await ref.source.doGetVersions(ref, maxAge, this);
 
-    versions = (await Future.wait(
-      versions.map((id) async {
-        final packageStatus = await ref.source.status(
-          id.toRef(),
-          id.version,
-          this,
-          maxAge: maxAge,
-        );
-        if (!packageStatus.isRetracted ||
-            id.version == allowedRetractedVersion) {
-          return id;
-        }
-        return null;
-      }),
-    ))
-        .nonNulls
-        .toList();
+    versions =
+        (await Future.wait(
+          versions.map((id) async {
+            final packageStatus = await ref.source.status(
+              id.toRef(),
+              id.version,
+              this,
+              maxAge: maxAge,
+            );
+            if (!packageStatus.isRetracted ||
+                id.version == allowedRetractedVersion) {
+              return id;
+            }
+            return null;
+          }),
+        )).nonNulls.toList();
 
     return versions;
   }
@@ -337,8 +340,10 @@ Consider setting the `PUB_CACHE` variable manually.
     final appData = Platform.environment['APPDATA'];
     if (appData == null) return;
     final legacyCacheLocation = p.join(appData, 'Pub', 'Cache');
-    final legacyCacheDeprecatedFile =
-        p.join(legacyCacheLocation, 'DEPRECATED.md');
+    final legacyCacheDeprecatedFile = p.join(
+      legacyCacheLocation,
+      'DEPRECATED.md',
+    );
     final stat = tryStatFile(legacyCacheDeprecatedFile);
     if ((stat == null ||
             DateTime.now().difference(stat.changed) >
@@ -399,6 +404,74 @@ https://dart.dev/go/pub-cache
   }
 
   bool _hasMaintainedCache = false;
+
+  late final _activeRootsDir = p.join(rootDir, 'active_roots');
+
+  /// Returns the paths of all packages_configs registered in
+  /// [_activeRootsDir].
+  List<String> activeRoots() {
+    final List<String> files;
+    try {
+      files = listDir(_activeRootsDir, includeDirs: false, recursive: true);
+    } on IOException {
+      return [];
+    }
+    final activeRoots = <String>[];
+    for (final file in files) {
+      final Object? decoded;
+      try {
+        decoded = jsonDecode(readTextFile(file));
+      } on IOException catch (e) {
+        log.fine('Could not read $file $e - deleting');
+        tryDeleteEntry(file);
+        continue;
+      } on FormatException catch (e) {
+        log.fine('Could not decode $file $e - deleting');
+        tryDeleteEntry(file);
+        continue;
+      }
+      if (decoded is! Map<String, Object?>) {
+        log.fine('Faulty $file - deleting');
+        tryDeleteEntry(file);
+        continue;
+      }
+      final uriText = decoded['package_config'];
+      if (uriText is! String) {
+        log.fine('Faulty $file - deleting');
+        tryDeleteEntry(file);
+        continue;
+      }
+      final uri = Uri.tryParse(uriText);
+      if (uri == null || !uri.isScheme('file')) {
+        log.fine('Faulty $file - deleting');
+        tryDeleteEntry(file);
+        continue;
+      }
+      activeRoots.add(uri.toFilePath());
+    }
+    return activeRoots;
+  }
+
+  /// Adds a file to the `PUB_CACHE/active_roots/` dir indicating
+  /// [packageConfigPath] is active.
+  void markRootActive(String packageConfigPath) {
+    final canonicalFileUri =
+        p.toUri(p.canonicalize(packageConfigPath)).toString();
+
+    final hash = hexEncode(sha256.convert(utf8.encode(canonicalFileUri)).bytes);
+
+    final firstTwo = hash.substring(0, 2);
+    final theRest = hash.substring(2);
+
+    final dir = p.join(_activeRootsDir, firstTwo);
+    ensureDir(dir);
+
+    final filename = p.join(dir, theRest);
+    writeTextFileIfDifferent(
+      filename,
+      '${jsonEncode({'package_config': canonicalFileUri})}\n',
+    );
+  }
 }
 
 typedef SourceRegistry = Source Function(String? name);
