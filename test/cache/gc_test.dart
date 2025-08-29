@@ -2,9 +2,9 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
+import 'package:dart_pub/src/system_cache.dart';
+import 'package:dart_pub/src/utils.dart';
 import 'package:path/path.dart' as p;
-import 'package:pub/src/system_cache.dart';
-import 'package:pub/src/utils.dart';
 import 'package:test/test.dart';
 
 import '../descriptor.dart' as d;
