@@ -1,0 +1,25 @@
+name: Sync version tags from SDK
+on:
+  schedule:
+    # Run every day at 00:00
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+jobs:
+  tag_from_sdk:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3
+      with:
+        fetch-depth: 0 # Check out everything to be able to tag.
+    - uses: dart-lang/setup-dart@e51d8e571e22473a2ddebf0ef8a2123f0ab2c02c
+      with:
+        sdk: stable
+    - id: install
+      name: Install dependencies
+      run: dart pub get
+    - id: tags
+      name: push_missing_tags_to_origin
+      run: dart tool/create_version_tags_from_sdk.dart --create --push

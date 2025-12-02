@@ -581,6 +581,10 @@ class HostedSource extends CachedSource {
     PackageRef ref,
     SystemCache cache,
   ) async {
+    if (cache.isOffline) {
+      // Don't attempt to fetch advisories in `--offline` mode.
+      return null;
+    }
     final description = ref.description;
     if (description is! HostedDescription) {
       throw ArgumentError('Wrong source');
@@ -1759,6 +1763,62 @@ See $contentHashesDocumentationUrl.
       // Otherwise re-throw the original exception.
       throw error;
     }
+  }
+
+  @override
+  Future<List<String>> entriesToGc(
+    SystemCache cache,
+    Set<String> alivePackages,
+  ) async {
+    final root = p.canonicalize(cache.rootDirForSource(this));
+    final result = <String>{};
+    final List<String> hostDirs;
+
+    try {
+      hostDirs = listDir(root);
+    } on IOException {
+      // Hosted cache seems uninitialized. GC nothing.
+      return [];
+    }
+    for (final hostDir in hostDirs) {
+      final List<String> packageDirs;
+      try {
+        packageDirs = listDir(hostDir).map(p.canonicalize).toList();
+      } on IOException {
+        // Failed to list `hostDir`. Perhaps a stray file? Skip.
+        continue;
+      }
+      for (final packageDir in packageDirs) {
+        if (!alivePackages.contains(packageDir)) {
+          result.add(packageDir);
+          // Also clear the associated hash file.
+          final hashFile = p.join(
+            cache.rootDir,
+            'hosted-hashes',
+            p.basename(hostDir),
+            '${p.basename(packageDir)}.sha256',
+          );
+          if (fileExists(hashFile)) {
+            result.add(hashFile);
+          }
+        }
+      }
+      // Clear all version listings older than two days, they'd likely need to
+      // be re-fetched anyways:
+      for (final cacheFile in listDir(
+        p.join(hostDir, _versionListingDirectory),
+      )) {
+        final stat = tryStatFile(cacheFile);
+
+        if (stat != null &&
+            DateTime.now().difference(stat.modified) >
+                const Duration(days: 2)) {
+          result.add(cacheFile);
+        }
+      }
+    }
+
+    return result.toList();
   }
 
   /// Enables speculative prefetching of dependencies of packages queried with
