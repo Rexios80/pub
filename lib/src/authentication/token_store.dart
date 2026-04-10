@@ -3,13 +3,12 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'dart:convert';
-import 'dart:io';
-
-import 'package:path/path.dart' as p;
 
 import '../exceptions.dart';
 import '../io.dart';
 import '../log.dart' as log;
+import '../path.dart';
+import '../platform_info.dart';
 import 'credential.dart';
 
 /// Stores and manages authentication credentials.
@@ -97,7 +96,7 @@ class TokenStore {
   }
 
   Never missingConfigDir() {
-    final variable = Platform.isWindows ? '%APPDATA%' : r'$HOME';
+    final variable = platform.isWindows ? '%APPDATA%' : r'$HOME';
     throw DataException('No config dir found. Check that $variable is set');
   }
 

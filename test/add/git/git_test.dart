@@ -2,7 +2,10 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-import 'package:dart_pub/src/exit_codes.dart' as exit_codes;
+@TestOn('vm')
+library;
+
+import 'package:pub/src/exit_codes.dart' as exit_codes;
 import 'package:test/test.dart';
 import '../../descriptor.dart' as d;
 import '../../test_pub.dart';
@@ -289,13 +292,13 @@ void main() {
       d.libPubspec('foo', '1.0.0'),
     ]).create();
 
-    await d.git('foo.git').tag('v1.0.0');
+    await d.git('foo.git').tag('v1.0.0', tagType: d.TagType.annotated);
 
     await d.git('foo.git', [
       d.libDir('foo'),
       d.libPubspec('foo', '2.0.0'),
     ]).commit();
-    await d.git('foo.git').tag('v2.0.0');
+    await d.git('foo.git').tag('v2.0.0', tagType: d.TagType.annotated);
     await d.git('foo.git', [
       d.libDir('foo'),
       d.libPubspec('foo', '3.0.0'),

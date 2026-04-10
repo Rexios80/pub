@@ -7,12 +7,12 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:path/path.dart' as p;
-
 import '../git.dart' as git;
 import '../ignore.dart';
 import '../io.dart';
 import '../log.dart' as log;
+import '../path.dart';
+import '../platform_info.dart';
 import '../utils.dart';
 import '../validator.dart';
 
@@ -60,7 +60,7 @@ class GitignoreValidator extends Validator {
         beneath = '';
       }
       String resolve(String path) {
-        if (Platform.isWindows) {
+        if (platform.isWindows) {
           return p.joinAll([root, ...p.posix.split(path)]);
         }
         return p.join(root, path);
@@ -92,7 +92,7 @@ class GitignoreValidator extends Validator {
             },
           ).map((file) {
             final relative = p.relative(resolve(file), from: package.dir);
-            return Platform.isWindows
+            return platform.isWindows
                 ? p.posix.joinAll(p.split(relative))
                 : relative;
           }).toSet();

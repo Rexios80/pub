@@ -10,7 +10,6 @@ import 'package:args/command_runner.dart';
 import 'package:collection/collection.dart' show IterableExtension;
 import 'package:http/http.dart' as http;
 import 'package:meta/meta.dart';
-import 'package:path/path.dart' as p;
 
 import 'authentication/token_store.dart';
 import 'entrypoint.dart';
@@ -19,7 +18,10 @@ import 'exit_codes.dart' as exit_codes;
 import 'git.dart' as git;
 import 'global_packages.dart';
 import 'http.dart';
+import 'io.dart';
 import 'log.dart' as log;
+import 'path.dart';
+import 'platform_info.dart';
 import 'pub_embeddable_command.dart';
 import 'sdk.dart';
 import 'solver.dart';
@@ -40,7 +42,7 @@ const pubCommandAliases = {
 final lineLength = _lineLength();
 
 int _lineLength() {
-  final fromEnv = Platform.environment['_PUB_TEST_TERMINAL_COLUMNS'];
+  final fromEnv = platform.environment['_PUB_TEST_TERMINAL_COLUMNS'];
   if (fromEnv != null) {
     final parsed = int.tryParse(fromEnv);
     if (parsed != null && parsed > 0) return parsed;
@@ -185,7 +187,20 @@ abstract class PubCommand extends Command<int> {
 
   @override
   @nonVirtual
-  FutureOr<int> run() async {
+  Future<int> run() async {
+    return await withOverrides(
+      _run,
+      fileSystem: _pubEmbeddableCommand?.fileSystem,
+      environment: _pubEmbeddableCommand?.environment,
+      platformVersion: _pubEmbeddableCommand?.platformVersion,
+      stdin: _pubEmbeddableCommand?.stdin,
+      stdout: _pubEmbeddableCommand?.stdout,
+      stderr: _pubEmbeddableCommand?.stderr,
+      httpClient: _pubEmbeddableCommand?.httpClient,
+    );
+  }
+
+  Future<int> _run() async {
     _computeCommand(_pubTopLevel.argResults);
     _decideOnColors(_pubTopLevel.argResults);
 

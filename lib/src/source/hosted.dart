@@ -12,7 +12,6 @@ import 'package:collection/collection.dart' show IterableExtension, maxBy;
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:meta/meta.dart';
-import 'package:path/path.dart' as p;
 import 'package:pool/pool.dart';
 import 'package:pub_semver/pub_semver.dart';
 import 'package:stack_trace/stack_trace.dart';
@@ -26,6 +25,8 @@ import '../language_version.dart';
 import '../log.dart' as log;
 import '../package.dart';
 import '../package_name.dart';
+import '../path.dart';
+import '../platform_info.dart';
 import '../pubspec.dart';
 import '../rate_limited_scheduler.dart';
 import '../source.dart';
@@ -109,8 +110,8 @@ Uri validateAndNormalizeHostedUrl(String hostedUrl) {
   }
   if (runningFromTest &&
       u == Uri.parse('https://pub.dev') &&
-      Platform.environment.containsKey('_PUB_TEST_DEFAULT_HOSTED_URL')) {
-    u = Uri.parse(Platform.environment['_PUB_TEST_DEFAULT_HOSTED_URL']!);
+      platform.environment.containsKey('_PUB_TEST_DEFAULT_HOSTED_URL')) {
+    u = Uri.parse(platform.environment['_PUB_TEST_DEFAULT_HOSTED_URL']!);
   }
   return u;
 }
@@ -141,8 +142,8 @@ class HostedSource extends CachedSource {
     final origin = parsedUrl.origin;
     // Allow the defaultHostedUrl to be overriden when running from tests
     if (runningFromTest &&
-        io.Platform.environment['_PUB_TEST_DEFAULT_HOSTED_URL'] != null) {
-      return origin == io.Platform.environment['_PUB_TEST_DEFAULT_HOSTED_URL'];
+        platform.environment['_PUB_TEST_DEFAULT_HOSTED_URL'] != null) {
+      return origin == platform.environment['_PUB_TEST_DEFAULT_HOSTED_URL'];
     }
     return origin == pubDevUrl || origin == pubDartlangUrl;
   }
@@ -171,11 +172,11 @@ class HostedSource extends CachedSource {
       // Allow the defaultHostedUrl to be overriden when running from tests
       if (runningFromTest) {
         defaultHostedUrl =
-            io.Platform.environment['_PUB_TEST_DEFAULT_HOSTED_URL'] ??
+            platform.environment['_PUB_TEST_DEFAULT_HOSTED_URL'] ??
             defaultHostedUrl;
       }
       return validateAndNormalizeHostedUrl(
-        io.Platform.environment['PUB_HOSTED_URL'] ?? defaultHostedUrl,
+        platform.environment['PUB_HOSTED_URL'] ?? defaultHostedUrl,
       ).toString();
     } on FormatException catch (e) {
       throw ConfigException(
@@ -183,25 +184,6 @@ class HostedSource extends CachedSource {
       );
     }
   }();
-
-  /// Whether extra metadata headers should be sent for HTTP requests to a given
-  /// [url].
-  static bool shouldSendAdditionalMetadataFor(Uri url) {
-    if (runningFromTest && Platform.environment.containsKey('PUB_HOSTED_URL')) {
-      if (url.origin != Platform.environment['PUB_HOSTED_URL']) {
-        return false;
-      }
-    } else {
-      if (!HostedSource.isPubDevUrl(url.toString())) return false;
-    }
-
-    if (Platform.environment.containsKey('CI') &&
-        Platform.environment['CI'] != 'false') {
-      return false;
-    }
-
-    return true;
-  }
 
   /// Returns a reference to a hosted package named [name].
   ///
@@ -499,7 +481,6 @@ class HostedSource extends CachedSource {
           () async {
             final request = http.Request('GET', url);
             request.attachPubApiHeaders();
-            request.attachMetadataHeaders();
             final response = await client.fetch(request);
             return response.body;
           },
@@ -547,15 +528,13 @@ class HostedSource extends CachedSource {
       final latestVersion =
           maxBy<_VersionInfo, Version>(listing, (e) => e.version)!;
       final dependencies = latestVersion.pubspec.dependencies.values;
-      unawaited(
-        withDependencyType(DependencyType.none, () async {
-          for (final packageRange in dependencies) {
-            if (packageRange.source is HostedSource) {
-              preschedule!(_RefAndCache(packageRange.toRef(), cache));
-            }
+      unawaited(() async {
+        for (final packageRange in dependencies) {
+          if (packageRange.source is HostedSource) {
+            preschedule!(_RefAndCache(packageRange.toRef(), cache));
           }
-        }),
-      );
+        }
+      }());
     }
 
     final cache = refAndCache.cache;
@@ -608,7 +587,6 @@ class HostedSource extends CachedSource {
           () async {
             final request = http.Request('GET', url);
             request.attachPubApiHeaders();
-            request.attachMetadataHeaders();
             final response = await client.fetch(request);
             return response.body;
           },
@@ -1243,7 +1221,7 @@ class HostedSource extends CachedSource {
           'Try again without --offline.',
         );
       }
-      contentHash = await _download(id, packageDir, cache);
+      contentHash = await _downloadAtomically(id, packageDir, cache);
     }
     return DownloadPackageResult(
       PackageId(
@@ -1377,7 +1355,7 @@ class HostedSource extends CachedSource {
                 );
                 try {
                   deleteEntry(package.dir);
-                  await _download(id, package.dir, cache);
+                  await _downloadAtomically(id, package.dir, cache);
                   return RepairResult(id.name, id.version, this, success: true);
                 } catch (error, stackTrace) {
                   var message =
@@ -1466,18 +1444,53 @@ class HostedSource extends CachedSource {
         .toList();
   }
 
-  Future<void> downloadInto(PackageId id, String destPath, SystemCache cache) =>
-      _download(id, destPath, cache);
+  Future<void> downloadInto(
+    PackageId id,
+    String destPath,
+    SystemCache cache,
+  ) async {
+    try {
+      // For the functionality of `unpack` it is important that the unpack
+      // doesn't go via the cache, as that would not allow unpacking into a
+      // directory on a different device than the cache. So we don't use
+      // `_downloadAtomically` here.
+      await _downloadAndExtract(id, destPath, cache);
+    } catch (e) {
+      tryDeleteEntry(destPath);
+      rethrow;
+    }
+  }
 
   /// Downloads package [id] from the archive_url and unpacks it into
-  /// [destPath].
+  /// [destPath]. The unpack is done to a temporary directory and then moved
+  /// into [destPath] atomically.
   ///
   /// If there is no archive_url, try to fetch it from
   /// `$server/packages/$package/versions/$version.tar.gz` where server comes
   /// from `id.description`.
   ///
   /// Returns the content-hash of the downloaded archive.
-  Future<Uint8List> _download(
+  Future<Uint8List> _downloadAtomically(
+    PackageId id,
+    String destPath,
+    SystemCache cache,
+  ) async {
+    final tempDir = cache.createTempDir();
+    try {
+      final contentHash = await _downloadAndExtract(id, tempDir, cache);
+      ensureDir(p.dirname(destPath));
+      tryRenameDir(tempDir, destPath);
+      return contentHash;
+    } catch (e) {
+      deleteEntry(tempDir);
+      rethrow;
+    }
+  }
+
+  /// Downloads the archive for [id] and extracts it to [destPath].
+  ///
+  /// Returns the content-hash of the downloaded archive.
+  Future<Uint8List> _downloadAndExtract(
     PackageId id,
     String destPath,
     SystemCache cache,
@@ -1561,7 +1574,6 @@ See $contentHashesDocumentationUrl.
           // [PubHttpException].
           await retryForHttp('downloading "$archiveUrl"', () async {
             final request = http.Request('GET', archiveUrl);
-            request.attachMetadataHeaders();
             final response = await client.fetchAsStream(request);
 
             Stream<List<int>> stream = response.stream;
@@ -1591,25 +1603,11 @@ See $contentHashesDocumentationUrl.
         _throwFriendlyError(error, stackTrace, id.name, description.url);
       }
 
-      final tempDir = cache.createTempDir();
       try {
-        try {
-          await extractTarGz(readBinaryFileAsStream(archivePath), tempDir);
-        } on FormatException catch (e) {
-          dataError('Failed to extract `$archivePath`: ${e.message}.');
-        }
-        ensureDir(p.dirname(destPath));
-      } catch (e) {
-        deleteEntry(tempDir);
-        rethrow;
+        await extractTarGz(readBinaryFileAsStream(archivePath), destPath);
+      } on FormatException catch (e) {
+        dataError('Failed to extract `$archivePath`: ${e.message}.');
       }
-      // Now that the get has succeeded, move it to the real location in the
-      // cache.
-      //
-      // If this fails with a "directory not empty" exception we assume that
-      // another pub process has installed the same package version while we
-      // downloaded.
-      tryRenameDir(tempDir, destPath);
       return contentHash;
     });
   }

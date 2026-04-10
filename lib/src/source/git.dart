@@ -5,7 +5,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:path/path.dart' as p;
 import 'package:pool/pool.dart';
 import 'package:pub_semver/pub_semver.dart';
 
@@ -16,6 +15,8 @@ import '../language_version.dart';
 import '../log.dart' as log;
 import '../package.dart';
 import '../package_name.dart';
+import '../path.dart';
+import '../platform_info.dart';
 import '../pubspec.dart';
 import '../source.dart';
 import '../system_cache.dart';
@@ -340,7 +341,7 @@ class GitSource extends CachedSource {
     );
 
     // Git doesn't recognize backslashes in paths, even on Windows.
-    if (Platform.isWindows) pathInCache = pathInCache.replaceAll('\\', '/');
+    if (platform.isWindows) pathInCache = pathInCache.replaceAll('\\', '/');
 
     final repoPath = _repoCachePath(description, cache);
     final revision = resolvedDescription.resolvedRef;
@@ -501,6 +502,11 @@ class GitSource extends CachedSource {
             revisionCachePath,
             cache,
           );
+          await git.run([
+            'config',
+            'remote.origin.lfsurl',
+            description.url,
+          ], workingDir: revisionCachePath);
           await _checkOut(revisionCachePath, resolvedRef);
           _writePackageList(revisionCachePath, [path]);
           didUpdate = true;
@@ -782,14 +788,19 @@ class GitSource extends CachedSource {
     String path,
     String tagPattern,
   ) async {
+    // For annotated tags, the `*` means we list the hash of the tagged object,
+    // not the tag itself. For lightweight tags, it lists the tag itself, which
+    // is the tagged object.
+    const objectFormat =
+        '%(if)%(*objectname)%(then)%(*objectname)%(else)%(objectname)%(end)';
     final output = await git.run([
+      _gitDirArg(path),
       'tag',
       '--list',
       '--format',
       // We can use space here, as it is not allowed in a git tag
-      // https://git-scm.com/docs/git-check-ref-format The `*` means we list the
-      // hash of the tagged object, not the tag itself.
-      '%(refname:lstrip=2) %(*objectname)',
+      // https://git-scm.com/docs/git-check-ref-format
+      '%(refname:lstrip=2) $objectFormat',
     ], workingDir: path);
     final lines = output.trim().split('\n');
     final result = <TaggedVersion>[];
@@ -851,7 +862,12 @@ class GitSource extends CachedSource {
     // Git on Windows does not seem to automatically create the destination
     // directory.
     ensureDir(to);
-    final args = ['clone', if (mirror) '--mirror', from, to];
+    final args = [
+      'clone',
+      if (mirror) '--mirror' else '--no-checkout',
+      from,
+      to,
+    ];
 
     await git.run(args);
   }
@@ -1168,7 +1184,7 @@ class _ValidatedUrl {
 String _gitDirArg(String path) {
   path = p.absolute(path);
   final forwardSlashPath =
-      Platform.isWindows ? path.replaceAll('\\', '/') : path;
+      platform.isWindows ? path.replaceAll('\\', '/') : path;
   return '--git-dir=$forwardSlashPath';
 }
 

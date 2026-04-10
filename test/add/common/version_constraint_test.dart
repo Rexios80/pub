@@ -2,7 +2,10 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-import 'package:dart_pub/src/exit_codes.dart' as exit_codes;
+@TestOn('vm')
+library;
+
+import 'package:pub/src/exit_codes.dart' as exit_codes;
 import 'package:test/test.dart';
 
 import '../../descriptor.dart' as d;
@@ -34,7 +37,7 @@ void main() {
 
     await d.appDir(dependencies: {}).create();
 
-    await pubAdd(args: ['foo:1.2.3']);
+    await pubAdd(args: ['foo@1.2.3']);
 
     await d.cacheDir({'foo': '1.2.3'}).validate();
     await d.appPackageConfigFile([
@@ -149,7 +152,7 @@ void main() {
       await d.appDir(dependencies: {'bar': '2.0.3'}).create();
 
       await pubAdd(
-        args: ['foo:1.2.3'],
+        args: ['foo@1.2.3'],
         error: contains(
           'Because every version of foo depends on bar 2.0.4 and myapp '
           'depends on bar 2.0.3, foo is forbidden.',

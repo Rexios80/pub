@@ -15,11 +15,6 @@ MSG : Logs written to $SANDBOX/cache/log/pub_log.txt.
 [E] IO  : Get versions from http://localhost:$PORT/api/packages/foo.
 [E] IO  : HTTP GET http://localhost:$PORT/api/packages/foo
 [E]    | Accept: application/vnd.pub.v2+json
-[E]    | X-Pub-OS: $OS
-[E]    | X-Pub-Command: get
-[E]    | X-Pub-Session-ID: $ID
-[E]    | X-Pub-Environment: test-environment
-[E]    | X-Pub-Reason: direct
 [E]    | user-agent: Dart pub 3.1.2+3
 [E] IO  : HTTP response 200 OK for GET http://localhost:$PORT/api/packages/foo
 [E]    | took: $TIME
@@ -37,15 +32,11 @@ MSG : Logs written to $SANDBOX/cache/log/pub_log.txt.
 [E] SLVR: Version solving took: $TIME
 [E]    | Tried 1 solutions.
 [E] FINE: Resolving dependencies finished ($TIME)
+[E] IO  : Created temp directory $DIR
 [E] IO  : Get package from http://localhost:$PORT/packages/foo/versions/1.0.0.tar.gz.
 [E] FINE: Downloading foo 1.0.0...
 [E] IO  : Created temp directory $DIR
 [E] IO  : HTTP GET http://localhost:$PORT/packages/foo/versions/1.0.0.tar.gz
-[E]    | X-Pub-OS: $OS
-[E]    | X-Pub-Command: get
-[E]    | X-Pub-Session-ID: $ID
-[E]    | X-Pub-Environment: test-environment
-[E]    | X-Pub-Reason: direct
 [E]    | user-agent: Dart pub 3.1.2+3
 [E] IO  : HTTP response 200 OK for GET http://localhost:$PORT/packages/foo/versions/1.0.0.tar.gz
 [E]    | took: $TIME
@@ -63,7 +54,6 @@ MSG : Logs written to $SANDBOX/cache/log/pub_log.txt.
 [E] FINE: Contents:
 [E]    | c35f6caa60870d3b6c5c6aebe5a5d4b56ca4733a52a80ded3445c0c5fa4b62df
 [E] FINE: Created $FILE from stream
-[E] IO  : Created temp directory $DIR
 [E] IO  : Reading binary file $FILE.
 [E] FINE: Extracting .tar.gz stream to $DIR
 [E] IO  : Creating $FILE from stream
@@ -71,8 +61,8 @@ MSG : Logs written to $SANDBOX/cache/log/pub_log.txt.
 [E] IO  : Creating $FILE from stream
 [E] FINE: Created $FILE from stream
 [E] FINE: Extracted .tar.gz to $DIR
-[E] IO  : Renaming directory $A to $B
 [E] IO  : Deleting directory $DIR
+[E] IO  : Renaming directory $A to $B
 [E] IO  : Writing $N characters to text file $SANDBOX/cache/README.md.
 [E] FINE: Contents:
 [E]    | Pub Package Cache
@@ -201,11 +191,6 @@ SLVR:   derived: foo any
 IO  : Get versions from http://localhost:$PORT/api/packages/foo.
 IO  : HTTP GET http://localhost:$PORT/api/packages/foo
    | Accept: application/vnd.pub.v2+json
-   | X-Pub-OS: $OS
-   | X-Pub-Command: get
-   | X-Pub-Session-ID: $ID
-   | X-Pub-Environment: test-environment
-   | X-Pub-Reason: direct
    | user-agent: Dart pub 3.1.2+3
 IO  : HTTP response 200 OK for GET http://localhost:$PORT/api/packages/foo
    | took: $TIME
@@ -224,15 +209,11 @@ SLVR: Version solving took: $TIME
    | Tried 1 solutions.
 FINE: Resolving dependencies finished ($TIME)
 MSG : Downloading packages...
+IO  : Created temp directory $DIR
 IO  : Get package from http://localhost:$PORT/packages/foo/versions/1.0.0.tar.gz.
 FINE: Downloading foo 1.0.0...
 IO  : Created temp directory $DIR
 IO  : HTTP GET http://localhost:$PORT/packages/foo/versions/1.0.0.tar.gz
-   | X-Pub-OS: $OS
-   | X-Pub-Command: get
-   | X-Pub-Session-ID: $ID
-   | X-Pub-Environment: test-environment
-   | X-Pub-Reason: direct
    | user-agent: Dart pub 3.1.2+3
 IO  : HTTP response 200 OK for GET http://localhost:$PORT/packages/foo/versions/1.0.0.tar.gz
    | took: $TIME
@@ -250,7 +231,6 @@ IO  : Writing $N characters to text file $SANDBOX/cache/hosted-hashes/localhost%
 FINE: Contents:
    | c35f6caa60870d3b6c5c6aebe5a5d4b56ca4733a52a80ded3445c0c5fa4b62df
 FINE: Created $FILE from stream
-IO  : Created temp directory $DIR
 IO  : Reading binary file $FILE.
 FINE: Extracting .tar.gz stream to $DIR
 IO  : Creating $FILE from stream
@@ -258,8 +238,8 @@ FINE: Created $FILE from stream
 IO  : Creating $FILE from stream
 FINE: Created $FILE from stream
 FINE: Extracted .tar.gz to $DIR
-IO  : Renaming directory $A to $B
 IO  : Deleting directory $DIR
+IO  : Renaming directory $A to $B
 IO  : Writing $N characters to text file $SANDBOX/cache/README.md.
 FINE: Contents:
    | Pub Package Cache
@@ -347,12 +327,14 @@ FINE: Contents:
 $ tool/test-bin/pub_command_runner.dart pub fail
 [E] Bad state: Pub has crashed
 [E]  tool/test-bin/pub_command_runner.dart $LINE:$COL ThrowingCommand.runProtected
-[E] package:dart_pub/src/command.dart $LINE:$COL PubCommand.run.<fn>
+[E] package:pub/src/command.dart $LINE:$COL PubCommand._run.<fn>
 [E] dart:async   new Future.sync
-[E] package:dart_pub/src/utils.dart $LINE:$COL captureErrors.wrappedCallback
+[E] package:pub/src/utils.dart $LINE:$COL captureErrors.wrappedCallback
 [E] dart:async   runZonedGuarded
-[E] package:dart_pub/src/utils.dart $LINE:$COL captureErrors
-[E] package:dart_pub/src/command.dart $LINE:$COL PubCommand.run
+[E] package:pub/src/utils.dart $LINE:$COL captureErrors
+[E] package:pub/src/command.dart $LINE:$COL PubCommand._run
+[E] package:pub/src/io.dart $LINE:$COL withOverrides
+[E] package:pub/src/command.dart $LINE:$COL PubCommand.run
 [E] package:args/command_runner.dart $LINE:$COL CommandRunner.runCommand
 [E]  tool/test-bin/pub_command_runner.dart $LINE:$COL Runner.runCommand
 [E]  tool/test-bin/pub_command_runner.dart $LINE:$COL Runner.run
@@ -388,12 +370,14 @@ FINE: Pub 3.1.2+3
 ERR : Bad state: Pub has crashed
 FINE: Exception type: StateError
 ERR : tool/test-bin/pub_command_runner.dart $LINE:$COL ThrowingCommand.runProtected
-   | package:dart_pub/src/command.dart $LINE:$COL PubCommand.run.<fn>
+   | package:pub/src/command.dart $LINE:$COL PubCommand._run.<fn>
    | dart:async   new Future.sync
-   | package:dart_pub/src/utils.dart $LINE:$COL captureErrors.wrappedCallback
+   | package:pub/src/utils.dart $LINE:$COL captureErrors.wrappedCallback
    | dart:async   runZonedGuarded
-   | package:dart_pub/src/utils.dart $LINE:$COL captureErrors
-   | package:dart_pub/src/command.dart $LINE:$COL PubCommand.run
+   | package:pub/src/utils.dart $LINE:$COL captureErrors
+   | package:pub/src/command.dart $LINE:$COL PubCommand._run
+   | package:pub/src/io.dart $LINE:$COL withOverrides
+   | package:pub/src/command.dart $LINE:$COL PubCommand.run
    | package:args/command_runner.dart $LINE:$COL CommandRunner.runCommand
    | tool/test-bin/pub_command_runner.dart $LINE:$COL Runner.runCommand
    | tool/test-bin/pub_command_runner.dart $LINE:$COL Runner.run

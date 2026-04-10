@@ -8,7 +8,6 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
-import 'package:path/path.dart' as p;
 
 import '../ascii_tree.dart' as tree;
 import '../authentication/client.dart';
@@ -20,6 +19,8 @@ import '../http.dart';
 import '../io.dart';
 import '../log.dart' as log;
 import '../oauth2.dart' as oauth2;
+import '../path.dart';
+import '../platform_info.dart';
 import '../pubspec.dart';
 import '../solver/type.dart';
 import '../source/hosted.dart' show validateAndNormalizeHostedUrl;
@@ -149,7 +150,6 @@ class LishCommand extends PubCommand {
               host.resolve('api/packages/versions/new'),
             );
             request.attachPubApiHeaders();
-            request.attachMetadataHeaders();
             return await client.fetch(request);
           },
         );
@@ -197,7 +197,6 @@ class LishCommand extends PubCommand {
           () async {
             final request = http.Request('GET', Uri.parse(location));
             request.attachPubApiHeaders();
-            request.attachMetadataHeaders();
             return await client.fetch(request);
           },
         );
@@ -249,8 +248,8 @@ class LishCommand extends PubCommand {
         // explicitly have to define mock servers as official server to test
         // publish command with oauth2 credentials.
         if (runningFromTest &&
-            Platform.environment.containsKey('_PUB_TEST_DEFAULT_HOSTED_URL'))
-          Platform.environment['_PUB_TEST_DEFAULT_HOSTED_URL'],
+            platform.environment.containsKey('_PUB_TEST_DEFAULT_HOSTED_URL'))
+          platform.environment['_PUB_TEST_DEFAULT_HOSTED_URL'],
       };
 
       // Using OAuth2 authentication client for the official pub servers

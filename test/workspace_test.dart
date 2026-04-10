@@ -2,11 +2,14 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
+@TestOn('vm')
+library;
+
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:dart_pub/src/exit_codes.dart';
-import 'package:path/path.dart' as p;
+import 'package:pub/src/exit_codes.dart';
+import 'package:pub/src/path.dart';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:test/test.dart';
 import 'package:yaml/yaml.dart';
@@ -535,7 +538,11 @@ transitive dependencies:
         "myapp",
         "both"
       ],
-      "devDependencies": []
+      "devDependencies": [],
+      "dependencyConstraints": {
+        "myapp": "any",
+        "both": "^1.0.0"
+      }
     },
     {
       "name": "both",
@@ -543,7 +550,8 @@ transitive dependencies:
       "kind": "direct",
       "source": "hosted",
       "dependencies": [],
-      "directDependencies": []
+      "directDependencies": [],
+      "dependencyConstraints": {}
     },
     {
       "name": "myapp",
@@ -558,7 +566,11 @@ transitive dependencies:
         "both",
         "b"
       ],
-      "devDependencies": []
+      "devDependencies": [],
+      "dependencyConstraints": {
+        "both": "^1.0.0",
+        "b": "any"
+      }
     },
     {
       "name": "a",
@@ -576,7 +588,12 @@ transitive dependencies:
       ],
       "devDependencies": [
         "both"
-      ]
+      ],
+      "dependencyConstraints": {
+        "myapp": "any",
+        "foo": "^1.0.0",
+        "both": "^1.0.0"
+      }
     },
     {
       "name": "foo",
@@ -588,7 +605,10 @@ transitive dependencies:
       ],
       "directDependencies": [
         "transitive"
-      ]
+      ],
+      "dependencyConstraints": {
+        "transitive": "^1.0.0"
+      }
     },
     {
       "name": "transitive",
@@ -596,7 +616,8 @@ transitive dependencies:
       "kind": "transitive",
       "source": "hosted",
       "dependencies": [],
-      "directDependencies": []
+      "directDependencies": [],
+      "dependencyConstraints": {}
     }
   ],
   "sdks": [

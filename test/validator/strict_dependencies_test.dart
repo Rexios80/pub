@@ -2,9 +2,12 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-import 'package:dart_pub/src/validator.dart';
-import 'package:dart_pub/src/validator/strict_dependencies.dart';
-import 'package:path/path.dart' as p;
+@TestOn('vm')
+library;
+
+import 'package:pub/src/path.dart';
+import 'package:pub/src/validator.dart';
+import 'package:pub/src/validator/strict_dependencies.dart';
 import 'package:test/test.dart';
 
 import '../descriptor.dart' as d;

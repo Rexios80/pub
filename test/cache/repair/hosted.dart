@@ -2,9 +2,7 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-import 'dart:io';
-
-import 'package:dart_pub/src/exit_codes.dart' as exit_codes;
+import 'package:pub/src/exit_codes.dart' as exit_codes;
 import 'package:test/test.dart';
 
 import '../../descriptor.dart' as d;
@@ -200,11 +198,6 @@ void main() {
         contains('Downloading bar 1.2.4...'),
         contains('Downloading foo 1.2.3...'),
         contains('Downloading foo 1.2.5...'),
-        contains('X-Pub-OS: ${Platform.operatingSystem}'),
-        contains('X-Pub-Command: cache repair'),
-        contains('X-Pub-Session-ID:'),
-        contains('X-Pub-Environment: test-environment'),
-        isNot(contains('X-Pub-Reason')),
       ]),
     );
 

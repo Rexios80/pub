@@ -14,11 +14,9 @@ import 'package:collection/collection.dart';
 import 'package:http/http.dart' as http;
 import 'package:pool/pool.dart';
 
-import 'command.dart';
 import 'log.dart' as log;
-import 'pubspec.dart';
+import 'platform_info.dart';
 import 'sdk.dart';
-import 'source/hosted.dart';
 import 'utils.dart';
 
 /// Headers and field names that should be censored in the log output.
@@ -31,22 +29,19 @@ const _censoredFields = ['refresh_token', 'authorization'];
 /// it's not supported.
 const pubApiHeaders = {'Accept': 'application/vnd.pub.v2+json'};
 
-/// A unique ID to identify this particular invocation of pub.
-final _sessionId = createUuid();
-
 /// An HTTP client that transforms 40* errors and socket exceptions into more
 /// user-friendly error messages.
 class _PubHttpClient extends http.BaseClient {
   final _requestStopwatches = <http.BaseRequest, Stopwatch>{};
 
-  http.Client _inner;
+  final http.Client _inner;
 
   /// We manually keep track of whether the client was closed,
   /// indicating that no more networking should be done. (And thus we don't need
   /// to retry failed requests).
   bool _wasClosed = false;
 
-  _PubHttpClient([http.Client? inner]) : _inner = inner ?? http.Client();
+  _PubHttpClient(this._inner);
 
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
@@ -161,56 +156,27 @@ class _PubHttpClient extends http.BaseClient {
   }
 }
 
-/// The [_PubHttpClient] wrapped by [globalHttpClient].
-final _pubClient = _PubHttpClient();
+final _defaultGlobalHttpClient = _PubHttpClient(http.Client());
 
 /// The HTTP client to use for all HTTP requests.
-final globalHttpClient = _pubClient;
+http.Client get globalHttpClient =>
+    Zone.current[_globalHttpClientKey] as http.Client? ??
+    _defaultGlobalHttpClient;
 
-/// The underlying HTTP client wrapped by [globalHttpClient].
-/// This enables the ability to use a mock client in tests.
-http.Client get innerHttpClient => _pubClient._inner;
-set innerHttpClient(http.Client client) => _pubClient._inner = client;
+/// The key for the [globalHttpClient] in the current [Zone].
+final _globalHttpClientKey = Object();
 
-/// Runs [callback] in a zone where all HTTP requests sent to `pub.dev`
-/// will indicate the [type] of the relationship between the root package and
-/// the package being requested.
-///
-/// If [type] is [DependencyType.none], no extra metadata is added.
-Future<T> withDependencyType<T>(
-  DependencyType type,
-  Future<T> Function() callback,
-) {
-  return runZoned(callback, zoneValues: {#_dependencyType: type});
-}
+/// Runs [callback] in a [Zone] where [globalHttpClient] wraps [client].
+R withHttpClient<R>(R Function() callback, {required http.Client client}) =>
+    runZoned(
+      callback,
+      zoneValues: {_globalHttpClientKey: _PubHttpClient(client)},
+    );
 
 extension AttachHeaders on http.Request {
   /// Adds headers required for pub.dev API requests.
   void attachPubApiHeaders() {
     headers.addAll(pubApiHeaders);
-  }
-
-  /// Adds request metadata headers about the Pub tool's environment and the
-  /// currently running command if the request URL indicates the destination is
-  /// a Hosted Pub Repository.
-  void attachMetadataHeaders() {
-    if (!HostedSource.shouldSendAdditionalMetadataFor(url)) {
-      return;
-    }
-
-    headers['X-Pub-OS'] = Platform.operatingSystem;
-    headers['X-Pub-Command'] = PubCommand.command;
-    headers['X-Pub-Session-ID'] = _sessionId;
-
-    final environment = Platform.environment['PUB_ENVIRONMENT'];
-    if (environment != null) {
-      headers['X-Pub-Environment'] = environment;
-    }
-
-    final type = Zone.current[#_dependencyType];
-    if (type != null && type != DependencyType.none) {
-      headers['X-Pub-Reason'] = type.toString();
-    }
   }
 }
 
@@ -380,7 +346,7 @@ Future<T> retryForHttp<T>(String operation, FutureOr<T> Function() fn) async {
             log.io('Attempt #$attemptNumber for $operation'),
     maxAttempts: math.max(
       1, // Having less than 1 attempt doesn't make sense.
-      int.tryParse(Platform.environment['PUB_MAX_HTTP_RETRIES'] ?? '') ?? 7,
+      int.tryParse(platform.environment['PUB_MAX_HTTP_RETRIES'] ?? '') ?? 7,
     ),
   );
 }

@@ -8,6 +8,7 @@ library;
 import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
+import 'dart:io' as io;
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -15,10 +16,12 @@ import 'package:async/async.dart';
 import 'package:cli_util/cli_util.dart'
     show EnvironmentNotFoundException, applicationConfigHome;
 import 'package:collection/collection.dart';
+import 'package:file/file.dart' as f;
+import 'package:file/local.dart' as f;
 import 'package:http/http.dart' show ByteStream;
+import 'package:http/http.dart' as http;
 import 'package:http_multi_server/http_multi_server.dart';
 import 'package:meta/meta.dart';
-import 'package:path/path.dart' as p;
 import 'package:pool/pool.dart';
 import 'package:stack_trace/stack_trace.dart';
 import 'package:tar/tar.dart';
@@ -26,7 +29,11 @@ import 'package:tar/tar.dart';
 import 'error_group.dart';
 import 'exceptions.dart';
 import 'exit_codes.dart' as exit_codes;
+import 'gzip/gzip.dart';
+import 'http.dart';
 import 'log.dart' as log;
+import 'path.dart';
+import 'platform_info.dart';
 import 'utils.dart';
 
 export 'package:http/http.dart' show ByteStream;
@@ -426,7 +433,7 @@ List<String> listDir(
         }
 
         if (pathInDir.contains('/.')) return false;
-        if (!Platform.isWindows) return true;
+        if (!platform.isWindows) return true;
         return !pathInDir.contains('\\.');
       })
       .map((entity) => entity.path)
@@ -454,7 +461,7 @@ void _attempt(
   void Function() operation, {
   bool ignoreEmptyDir = false,
 }) {
-  if (!Platform.isWindows) {
+  if (!platform.isWindows) {
     operation();
     return;
   }
@@ -593,11 +600,11 @@ bool _isDirectoryNotEmptyException(FileSystemException e) {
   // ```
   // https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/include/uapi/asm-generic/errno-base.h#n21
   // https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/include/uapi/asm-generic/errno.h#n20
-  (Platform.isLinux && (errorCode == 39 || errorCode == 17)) ||
+  (platform.isLinux && (errorCode == 39 || errorCode == 17)) ||
       // On Windows this may fail with ERROR_DIR_NOT_EMPTY or
       // ERROR_ALREADY_EXISTS
       // https://docs.microsoft.com/en-us/windows/win32/debug/system-error-codes--0-499-
-      (Platform.isWindows && (errorCode == 145 || errorCode == 183)) ||
+      (platform.isWindows && (errorCode == 145 || errorCode == 183)) ||
       // On MacOS rename will fail with ENOTEMPTY if directory exists.
       // We also catch EEXIST - perhaps that could also be thrown...
       // ```
@@ -605,7 +612,7 @@ bool _isDirectoryNotEmptyException(FileSystemException e) {
       // #define	EEXIST		17	/* File exists */
       // ```
       // https://github.com/apple-oss-distributions/xnu/blob/bb611c8fecc755a0d8e56e2fa51513527c5b7a0e/bsd/sys/errno.h#L190
-      (Platform.isMacOS && (errorCode == 66 || errorCode == 17));
+      (platform.isMacOS && (errorCode == 66 || errorCode == 17));
 }
 
 /// Creates a new symlink at path [symlink] that points to [target].
@@ -622,7 +629,7 @@ void createSymlink(String target, String symlink, {bool relative = false}) {
     // make sure we have a clean absolute path because it will interpret a
     // relative path to be relative to the cwd, not the symlink, and will be
     // confused by forward slashes.
-    if (Platform.isWindows) {
+    if (platform.isWindows) {
       target = p.normalize(p.absolute(target));
     } else {
       // If the directory where we're creating the symlink was itself reached
@@ -666,7 +673,7 @@ void createPackageSymlink(
 /// The "_PUB_TESTING" variable is automatically set for all the test code's
 /// invocations of pub.
 final bool runningFromTest =
-    Platform.environment.containsKey('_PUB_TESTING') && _assertionsEnabled;
+    platform.environment.containsKey('_PUB_TESTING') && _assertionsEnabled;
 
 final bool _assertionsEnabled = () {
   try {
@@ -679,8 +686,8 @@ final bool _assertionsEnabled = () {
 }();
 
 final bool runningFromFlutter =
-    Platform.environment.containsKey('PUB_ENVIRONMENT') &&
-    (Platform.environment['PUB_ENVIRONMENT'] ?? '').contains('flutter_cli');
+    platform.environment.containsKey('PUB_ENVIRONMENT') &&
+    (platform.environment['PUB_ENVIRONMENT'] ?? '').contains('flutter_cli');
 
 /// A regular expression to match the script path of a pub script running from
 /// source in the Dart repo.
@@ -696,7 +703,7 @@ final _dartRepoRegExp = RegExp(
 ///
 /// This can happen when running tests against the repo, as well as when
 /// building Observatory.
-final bool runningFromDartRepo = Platform.script.path.contains(_dartRepoRegExp);
+final bool runningFromDartRepo = platform.script.path.contains(_dartRepoRegExp);
 
 /// The path to the root of the Dart repo.
 ///
@@ -710,8 +717,8 @@ final String dartRepoRoot =
 
       // Get the URL of the repo root in a way that works when either both
       // running as a test or as a pub executable.
-      final url = Platform.script.replace(
-        path: Platform.script.path.replaceAll(_dartRepoRegExp, ''),
+      final url = platform.script.replace(
+        path: platform.script.path.replaceAll(_dartRepoRegExp, ''),
       );
       return p.fromUri(url);
     })();
@@ -758,7 +765,7 @@ Future<String> stdinPrompt(String prompt, {bool? echoMode}) async {
 /// [EnvironmentKeys.forceTerminalOutput].
 bool get terminalOutputForStdout {
   final environmentValue =
-      Platform.environment[EnvironmentKeys.forceTerminalOutput];
+      platform.environment[EnvironmentKeys.forceTerminalOutput];
   if (environmentValue == null || environmentValue == '') {
     return stdout.hasTerminal;
   } else if (environmentValue == '0') {
@@ -1080,7 +1087,7 @@ class PubProcess {
   // Spawning a process on Windows will not look for the executable in the
   // system path. So, if executable looks like it needs that (i.e. it doesn't
   // have any path separators in it), then spawn it through a shell.
-  if (Platform.isWindows && !executable.contains('\\')) {
+  if (platform.isWindows && !executable.contains('\\')) {
     args = ['/c', executable, ...args];
     executable = 'cmd';
   }
@@ -1135,7 +1142,7 @@ Future<Uint8List> extractFileFromTarGz(
   Stream<List<int>> stream,
   String filename,
 ) async {
-  final reader = TarReader(stream.transform(gzip.decoder));
+  final reader = TarReader(stream.transform(gzipDecoder));
   filename = p.posix.normalize(filename);
   while (await reader.moveNext()) {
     final entry = reader.current;
@@ -1154,7 +1161,7 @@ Future<void> extractTarGz(Stream<List<int>> stream, String destination) async {
   log.fine('Extracting .tar.gz stream to $destination.');
 
   destination = p.absolute(destination);
-  final reader = TarReader(stream.transform(gzip.decoder));
+  final reader = TarReader(stream.transform(gzipDecoder));
   final paths = <String>{};
   while (await reader.moveNext()) {
     final entry = reader.current;
@@ -1204,7 +1211,7 @@ Future<void> extractTarGz(Stream<List<int>> stream, String destination) async {
         ensureDir(parentDirectory);
         await createFileFromStream(entry.contents, filePath);
 
-        if (Platform.isLinux || Platform.isMacOS) {
+        if (platform.isLinux || platform.isMacOS) {
           // Apply executable bits from tar header, but don't change r/w bits
           // from the default
           final mode = _defaultMode | (entry.header.mode & _executableMask);
@@ -1333,8 +1340,17 @@ ByteStream createTarGz(List<String> contents, {required String baseDir}) {
 /// `null` if no config dir could be found.
 final String? dartConfigDir = () {
   if (runningFromTest &&
-      Platform.environment.containsKey('_PUB_TEST_CONFIG_DIR')) {
-    return p.join(Platform.environment['_PUB_TEST_CONFIG_DIR']!, 'dart');
+      platform.environment.containsKey('_PUB_TEST_CONFIG_DIR')) {
+    return p.join(platform.environment['_PUB_TEST_CONFIG_DIR']!, 'dart');
+  }
+  // If `dart:io` is unavailable, typically that means we're running in
+  // dart2wasm or dart2js mode. Then we won't call into cli_util!
+  if (!const bool.fromEnvironment('dart.library.io')) {
+    final xdgConfigHome = platform.environment['XDG_CONFIG_HOME'];
+    if (xdgConfigHome != null && xdgConfigHome.isNotEmpty) {
+      return p.join(xdgConfigHome, 'dart');
+    }
+    return null;
   }
   try {
     return applicationConfigHome('dart');
@@ -1380,4 +1396,252 @@ Iterable<String> parentDirs(String path, {String? from}) sync* {
     if (parent == d) break;
     d = parent;
   }
+}
+
+/// Run [fn] in a zone with overrides.
+R withOverrides<R>(
+  R Function() fn, {
+  f.FileSystem? fileSystem,
+  Map<String, String>? environment,
+  String? platformVersion,
+  Stream<List<int>>? stdin,
+  StreamSink<List<int>>? stdout,
+  StreamSink<List<int>>? stderr,
+  http.Client? httpClient,
+}) {
+  // If there are no overrides we're done
+  if (fileSystem == null &&
+      environment == null &&
+      platformVersion == null &&
+      stdin == null &&
+      stdout == null &&
+      stderr == null &&
+      httpClient == null) {
+    return fn();
+  }
+
+  fileSystem ??= const f.LocalFileSystem();
+  environment ??= platform.environment;
+  platformVersion ??= platform.version;
+  stdin ??= io.stdin;
+  stdout ??= io.stdout;
+  stderr ??= io.stderr;
+  final client = httpClient ?? http.Client();
+
+  final pathContext = fileSystem.path;
+
+  return IOOverrides.runWithIOOverrides(
+    () {
+      return withPlatform(
+        () {
+          return withHttpClient(() {
+            return withPathContext(fn, pathContext: pathContext);
+          }, client: client);
+        },
+        platform: PlatformInfo.override(
+          environment: environment,
+          version: platformVersion,
+          pathSeparator: pathContext.separator,
+        ),
+      );
+    },
+    _IOOverrides(
+      fileSystem: fileSystem,
+      stdin: stdin is Stdin ? stdin : StdinStream(stdin),
+      stdout: stdout is Stdout ? stdout : StdoutSink(stdout),
+      stderr: stderr is Stdout ? stderr : StdoutSink(stderr),
+    ),
+  );
+}
+
+/// An [IOOverrides] that uses a [f.FileSystem] for all operations.
+final class _IOOverrides extends IOOverrides {
+  final f.FileSystem fileSystem;
+
+  @override
+  final Stdin stdin;
+
+  @override
+  final Stdout stdout;
+
+  @override
+  final Stdout stderr;
+
+  _IOOverrides({
+    required this.fileSystem,
+    required this.stdin,
+    required this.stdout,
+    required this.stderr,
+  });
+
+  @override
+  File createFile(String path) => fileSystem.file(path);
+
+  @override
+  Directory createDirectory(String path) => fileSystem.directory(path);
+
+  @override
+  Link createLink(String path) => fileSystem.link(path);
+
+  @override
+  Future<FileStat> stat(String path) => fileSystem.stat(path);
+
+  @override
+  FileStat statSync(String path) => fileSystem.statSync(path);
+
+  @override
+  Future<bool> fseIdentical(String path1, String path2) =>
+      fileSystem.identical(path1, path2);
+
+  @override
+  bool fseIdenticalSync(String path1, String path2) =>
+      fileSystem.identicalSync(path1, path2);
+
+  @override
+  Future<FileSystemEntityType> fseGetType(String path, bool followLinks) =>
+      fileSystem.type(path, followLinks: followLinks);
+
+  @override
+  FileSystemEntityType fseGetTypeSync(String path, bool followLinks) =>
+      fileSystem.typeSync(path, followLinks: followLinks);
+
+  @override
+  Directory getCurrentDirectory() => fileSystem.currentDirectory;
+
+  @override
+  void setCurrentDirectory(String path) {
+    fileSystem.currentDirectory = path;
+  }
+
+  @override
+  Directory getSystemTempDirectory() => fileSystem.systemTempDirectory;
+
+  @override
+  bool fsWatchIsSupported() => fileSystem.isWatchSupported;
+
+  @override
+  Stream<FileSystemEvent> fsWatch(String path, int events, bool recursive) =>
+      fileSystem.directory(path).watch(events: events, recursive: recursive);
+}
+
+/// Wrap a [Stream<List<int>>] as [Stdin].
+final class StdinStream extends StreamView<List<int>> implements Stdin {
+  StdinStream(super.stream);
+
+  @override
+  bool get echoMode => false;
+
+  @override
+  set echoMode(bool value) {}
+
+  @override
+  bool get echoNewlineMode => false;
+
+  @override
+  set echoNewlineMode(bool value) {}
+
+  @override
+  bool get lineMode => false;
+
+  @override
+  set lineMode(bool value) {}
+
+  @override
+  bool get hasTerminal => false;
+
+  @override
+  int readByteSync() => throw UnsupportedError('cannot read sync from stdin');
+
+  @override
+  String? readLineSync({
+    Encoding encoding = systemEncoding,
+    bool retainNewlines = false,
+  }) => throw UnsupportedError('cannot read sync from stdin');
+
+  @override
+  bool get supportsAnsiEscapes => false;
+}
+
+/// Wrap a [StreamSink<List<int>>] as [Stdout].
+final class StdoutSink implements Stdout {
+  final StreamSink<List<int>> _sink;
+
+  StdoutSink(this._sink);
+
+  @override
+  Encoding encoding = utf8;
+
+  @override
+  void add(List<int> data) {
+    _sink.add(data);
+  }
+
+  @override
+  void addError(Object error, [StackTrace? stackTrace]) {
+    _sink.addError(error, stackTrace);
+  }
+
+  @override
+  Future addStream(Stream<List<int>> stream) => _sink.addStream(stream);
+
+  @override
+  Future close() => _sink.close();
+
+  @override
+  Future get done => _sink.done;
+
+  @override
+  Future flush() async {}
+
+  @override
+  bool get hasTerminal => false;
+
+  @override
+  IOSink get nonBlocking => this;
+
+  @override
+  bool get supportsAnsiEscapes => false;
+
+  @override
+  int get terminalColumns =>
+      throw const StdoutException('no terminal attached');
+
+  @override
+  int get terminalLines => throw const StdoutException('no terminal attached');
+
+  @override
+  void write(Object? object) {
+    add(encoding.encode('$object'));
+  }
+
+  @override
+  void writeAll(Iterable objects, [String separator = '']) {
+    final iterator = objects.iterator;
+    if (!iterator.moveNext()) return;
+    if (separator.isEmpty) {
+      do {
+        write(iterator.current);
+      } while (iterator.moveNext());
+    } else {
+      write(iterator.current);
+      while (iterator.moveNext()) {
+        write(separator);
+        write(iterator.current);
+      }
+    }
+  }
+
+  @override
+  void writeCharCode(int charCode) {
+    write(String.fromCharCode(charCode));
+  }
+
+  @override
+  void writeln([Object? object = '']) {
+    write(object);
+    write(lineTerminator);
+  }
+
+  @override
+  String lineTerminator = '\n';
 }

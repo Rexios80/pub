@@ -4,7 +4,6 @@
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'dart:math';
 
 import 'package:collection/collection.dart';
@@ -12,13 +11,14 @@ import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/retry.dart';
 import 'package:http_parser/http_parser.dart';
-import 'package:path/path.dart' as p;
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
 
 import 'http.dart';
 import 'io.dart';
 import 'log.dart' as log;
+import 'path.dart';
+import 'platform_info.dart';
 import 'utils.dart';
 
 /// The global HTTP client with basic retries. Used instead of retryForHttp for
@@ -65,7 +65,7 @@ final _authorizationEndpoint = Uri.parse(
 /// This can be controlled externally by setting the `_PUB_TEST_TOKEN_ENDPOINT`
 /// environment variable.
 Uri get tokenEndpoint {
-  final tokenEndpoint = Platform.environment['_PUB_TEST_TOKEN_ENDPOINT'];
+  final tokenEndpoint = platform.environment['_PUB_TEST_TOKEN_ENDPOINT'];
   if (tokenEndpoint != null) {
     return Uri.parse(tokenEndpoint);
   } else {

@@ -11,13 +11,14 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:args/command_runner.dart';
-import 'package:path/path.dart' as p;
 import 'package:source_span/source_span.dart';
 import 'package:stack_trace/stack_trace.dart';
 
 import 'entrypoint.dart';
 import 'exceptions.dart';
 import 'io.dart';
+import 'path.dart';
+import 'platform_info.dart';
 import 'progress.dart';
 import 'sdk.dart';
 import 'transcript.dart';
@@ -372,11 +373,11 @@ Before making this file public, make sure to remove any sensitive information!
 
 Pub version: ${sdk.version}
 Created: ${DateTime.now().toIso8601String()}
-FLUTTER_ROOT: ${Platform.environment['FLUTTER_ROOT'] ?? '<not set>'}
-PUB_HOSTED_URL: ${Platform.environment['PUB_HOSTED_URL'] ?? '<not set>'}
-PUB_CACHE: "${Platform.environment['PUB_CACHE'] ?? '<not set>'}"
+FLUTTER_ROOT: ${platform.environment['FLUTTER_ROOT'] ?? '<not set>'}
+PUB_HOSTED_URL: ${platform.environment['PUB_HOSTED_URL'] ?? '<not set>'}
+PUB_CACHE: "${platform.environment['PUB_CACHE'] ?? '<not set>'}"
 Command: $command
-Platform: ${Platform.operatingSystem}
+Platform: ${platform.operatingSystem}
 ''');
 
   if (entrypoint != null) {

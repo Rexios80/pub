@@ -2,7 +2,10 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-import 'package:path/path.dart' as p;
+@TestOn('vm')
+library;
+
+import 'package:pub/src/path.dart';
 import 'package:test/test.dart';
 
 import 'descriptor.dart' as d;
@@ -169,7 +172,14 @@ void main() {
       ],
       "devDependencies": [
         "unittest"
-      ]
+      ],
+      "dependencyConstraints": {
+        "normal": "any",
+        "overridden": "2.0.0",
+        "from_path": "any",
+        "unittest": "any",
+        "override_only": "any"
+      }
     },
     {
       "name": "override_only",
@@ -177,7 +187,8 @@ void main() {
       "kind": "transitive",
       "source": "hosted",
       "dependencies": [],
-      "directDependencies": []
+      "directDependencies": [],
+      "dependencyConstraints": {}
     },
     {
       "name": "unittest",
@@ -191,7 +202,11 @@ void main() {
       "directDependencies": [
         "shared",
         "dev_only"
-      ]
+      ],
+      "dependencyConstraints": {
+        "shared": "any",
+        "dev_only": "any"
+      }
     },
     {
       "name": "dev_only",
@@ -199,7 +214,8 @@ void main() {
       "kind": "transitive",
       "source": "hosted",
       "dependencies": [],
-      "directDependencies": []
+      "directDependencies": [],
+      "dependencyConstraints": {}
     },
     {
       "name": "shared",
@@ -211,7 +227,10 @@ void main() {
       ],
       "directDependencies": [
         "other"
-      ]
+      ],
+      "dependencyConstraints": {
+        "other": "any"
+      }
     },
     {
       "name": "other",
@@ -223,7 +242,10 @@ void main() {
       ],
       "directDependencies": [
         "myapp"
-      ]
+      ],
+      "dependencyConstraints": {
+        "myapp": "any"
+      }
     },
     {
       "name": "from_path",
@@ -231,7 +253,8 @@ void main() {
       "kind": "direct",
       "source": "path",
       "dependencies": [],
-      "directDependencies": []
+      "directDependencies": [],
+      "dependencyConstraints": {}
     },
     {
       "name": "overridden",
@@ -239,7 +262,8 @@ void main() {
       "kind": "direct",
       "source": "hosted",
       "dependencies": [],
-      "directDependencies": []
+      "directDependencies": [],
+      "dependencyConstraints": {}
     },
     {
       "name": "normal",
@@ -253,7 +277,11 @@ void main() {
       "directDependencies": [
         "transitive",
         "circular_a"
-      ]
+      ],
+      "dependencyConstraints": {
+        "transitive": "any",
+        "circular_a": "any"
+      }
     },
     {
       "name": "circular_a",
@@ -265,7 +293,10 @@ void main() {
       ],
       "directDependencies": [
         "circular_b"
-      ]
+      ],
+      "dependencyConstraints": {
+        "circular_b": "any"
+      }
     },
     {
       "name": "circular_b",
@@ -277,7 +308,10 @@ void main() {
       ],
       "directDependencies": [
         "circular_a"
-      ]
+      ],
+      "dependencyConstraints": {
+        "circular_a": "any"
+      }
     },
     {
       "name": "transitive",
@@ -289,7 +323,10 @@ void main() {
       ],
       "directDependencies": [
         "shared"
-      ]
+      ],
+      "dependencyConstraints": {
+        "shared": "any"
+      }
     }
   ],
   "sdks": [

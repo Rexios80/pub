@@ -2,10 +2,13 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-import 'package:dart_pub/src/exit_codes.dart' as exit_codes;
-import 'package:dart_pub/src/exit_codes.dart';
-import 'package:dart_pub/src/io.dart';
-import 'package:path/path.dart' as p;
+@TestOn('vm')
+library;
+
+import 'package:pub/src/exit_codes.dart' as exit_codes;
+import 'package:pub/src/exit_codes.dart';
+import 'package:pub/src/io.dart';
+import 'package:pub/src/path.dart';
 import 'package:shelf/shelf.dart';
 import 'package:test/test.dart';
 import 'package:yaml/yaml.dart';

@@ -17,20 +17,18 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:async/async.dart';
-import 'package:dart_pub/src/entrypoint.dart';
-import 'package:dart_pub/src/exit_codes.dart' as exit_codes;
-import 'package:dart_pub/src/git.dart' as git;
-import 'package:dart_pub/src/http.dart';
-import 'package:dart_pub/src/io.dart';
-import 'package:dart_pub/src/lock_file.dart';
-import 'package:dart_pub/src/log.dart' as log;
-import 'package:dart_pub/src/package_name.dart';
-import 'package:dart_pub/src/source/hosted.dart';
-import 'package:dart_pub/src/system_cache.dart';
-import 'package:dart_pub/src/utils.dart';
-import 'package:dart_pub/src/validator.dart';
-import 'package:http/testing.dart';
-import 'package:path/path.dart' as p;
+import 'package:pub/src/entrypoint.dart';
+import 'package:pub/src/exit_codes.dart' as exit_codes;
+import 'package:pub/src/git.dart' as git;
+import 'package:pub/src/io.dart';
+import 'package:pub/src/lock_file.dart';
+import 'package:pub/src/log.dart' as log;
+import 'package:pub/src/package_name.dart';
+import 'package:pub/src/path.dart';
+import 'package:pub/src/source/hosted.dart';
+import 'package:pub/src/system_cache.dart';
+import 'package:pub/src/utils.dart';
+import 'package:pub/src/validator.dart';
 import 'package:pub_semver/pub_semver.dart';
 import 'package:tar/tar.dart';
 import 'package:test/test.dart' as test show fail;
@@ -469,6 +467,9 @@ Map<String, String> getPubTestEnvironment([String? tokenEndpoint]) => {
   if (tokenEndpoint != null) '_PUB_TEST_TOKEN_ENDPOINT': tokenEndpoint,
   if (_globalServer?.port != null)
     'PUB_HOSTED_URL': 'http://localhost:${_globalServer?.port}',
+  'GIT_CONFIG_COUNT': '1',
+  'GIT_CONFIG_KEY_0': 'safe.bareRepository',
+  'GIT_CONFIG_VALUE_0': 'explicit',
 };
 
 /// The path to the root of pub's sources in the pub repo.
@@ -754,18 +755,6 @@ LockFile _createLockFile(
   return LockFile(packages);
 }
 
-/// Uses [client] as the mock HTTP client for this test.
-///
-/// Note that this will only affect HTTP requests made via http.dart in the
-/// parent process.
-void useMockClient(MockClient client) {
-  final oldInnerClient = innerHttpClient;
-  innerHttpClient = client;
-  addTearDown(() {
-    innerHttpClient = oldInnerClient;
-  });
-}
-
 /// Describes a map representing a library package with the given [name],
 /// [version], and [dependencies].
 Map<String, Object> packageMap(
@@ -948,7 +937,8 @@ String filterUnstableText(String input) {
       );
   final port = _globalServer?.port;
   if (port != null) {
-    input = input.replaceAll(port.toString(), '\$PORT');
+    input = input.replaceAll(':$port', ':\$PORT');
+    input = input.replaceAll('%58$port', '%58\$PORT');
   }
   return input;
 }

@@ -2,7 +2,6 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-import 'package:path/path.dart' as p;
 import 'package:pub_semver/pub_semver.dart';
 import 'package:yaml/yaml.dart';
 
@@ -12,6 +11,7 @@ import '../entrypoint.dart';
 import '../io.dart';
 import '../log.dart' as log;
 import '../package_name.dart';
+import '../path.dart';
 import '../pubspec.dart';
 import '../sdk.dart';
 import '../solver/type.dart';
@@ -34,7 +34,7 @@ For example:
 Downloads and extracts the latest stable version of package:foo from pub.dev
 in a directory `foo-<version>`.
 
-  $topLevelProgram pub unpack foo:1.2.3-pre --no-resolve
+  $topLevelProgram pub unpack foo@1.2.3-pre --no-resolve
 
 Downloads and extracts package:foo version 1.2.3-pre in a directory
 `foo-1.2.3-pre` without running implicit `pub get`.
@@ -44,14 +44,14 @@ Downloads and extracts package:foo version 1.2.3-pre in a directory
 Downloads and extracts the latest stable version of package:foo in a directory
 `archives/foo-<version>`.
 
-  $topLevelProgram pub unpack 'foo:{hosted:"https://my_repo.org"}'
+  $topLevelProgram pub unpack 'foo@{hosted:"https://my_repo.org"}'
 
 Downloads and extracts the latest stable version of package:foo from my_repo.org
 in a directory `foo-<version>`.
 ''';
 
   @override
-  String get argumentsDescription => 'package-name[:descriptor]';
+  String get argumentsDescription => 'package-name[@<descriptor>]';
 
   @override
   String get docUrl => 'https://dart.dev/tools/pub/cmd/pub-unpack';
@@ -81,7 +81,7 @@ in a directory `foo-<version>`.
 
   static final _argRegExp = RegExp(
     r'^(?<name>[a-zA-Z0-9_.]+)'
-    r'(?::(?<descriptor>.*))?$',
+    r'(?:[:@](?<descriptor>.*))?$',
   );
 
   @override
@@ -95,7 +95,7 @@ in a directory `foo-<version>`.
     final arg = argResults.rest[0];
     final match = _argRegExp.firstMatch(arg);
     if (match == null) {
-      usageException('Use the form package:descriptor to specify the package.');
+      usageException('Use the form package@descriptor to specify the package.');
     }
     final parseResult = _parseDescriptor(
       match.namedGroup('name')!,

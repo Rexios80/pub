@@ -2,7 +2,10 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-import 'package:dart_pub/src/exit_codes.dart' as exit_codes;
+@TestOn('vm')
+library;
+
+import 'package:pub/src/exit_codes.dart' as exit_codes;
 import 'package:test/test.dart';
 
 import '../../descriptor.dart' as d;
@@ -23,7 +26,7 @@ void main() {
 
     final url = server.url;
 
-    await pubAdd(args: ['foo:1.2.3', '--hosted-url', url]);
+    await pubAdd(args: ['foo@1.2.3', '--hosted-url', url]);
 
     await d.cacheDir({'foo': '1.2.3'}, port: server.port).validate();
 
@@ -59,7 +62,7 @@ void main() {
 
     final url = server.url;
 
-    await pubAdd(args: ['foo:1.2.3', '--hosted-url', url]);
+    await pubAdd(args: ['foo@1.2.3', '--hosted-url', url]);
 
     await d
         .appDir(
@@ -92,7 +95,7 @@ void main() {
     final url = server.url;
 
     await pubAdd(
-      args: ['foo:1.2.3', 'bar:3.2.3', 'baz:1.3.5', '--hosted-url', url],
+      args: ['foo@1.2.3', 'bar:3.2.3', 'baz:1.3.5', '--hosted-url', url],
     );
 
     await d.cacheDir({
