@@ -7,7 +7,7 @@ import 'dart:convert' show utf8;
 import 'dart:io';
 
 import 'package:collection/collection.dart';
-import 'package:pub/src/path.dart';
+import 'package:dart_pub/src/path.dart';
 import 'package:test/test.dart';
 import 'package:test_descriptor/test_descriptor.dart';
 import 'package:yaml/yaml.dart';

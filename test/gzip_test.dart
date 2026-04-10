@@ -7,7 +7,7 @@ library;
 
 import 'dart:convert';
 
-import 'package:pub/src/gzip/gzip.dart';
+import 'package:dart_pub/src/gzip/gzip.dart';
 import 'package:test/test.dart';
 
 void main() {

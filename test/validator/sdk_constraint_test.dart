@@ -5,8 +5,8 @@
 @TestOn('vm')
 library;
 
-import 'package:pub/src/validator.dart';
-import 'package:pub/src/validator/sdk_constraint.dart';
+import 'package:dart_pub/src/validator.dart';
+import 'package:dart_pub/src/validator/sdk_constraint.dart';
 import 'package:test/test.dart';
 
 import '../descriptor.dart' as d;

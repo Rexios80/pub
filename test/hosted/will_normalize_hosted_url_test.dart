@@ -5,8 +5,8 @@
 @TestOn('vm')
 library;
 
+import 'package:dart_pub/src/exit_codes.dart' as exit_codes;
 import 'package:http/http.dart' as http;
-import 'package:pub/src/exit_codes.dart' as exit_codes;
 import 'package:shelf/shelf.dart';
 import 'package:test/test.dart';
 

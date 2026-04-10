@@ -5,8 +5,8 @@
 @TestOn('vm')
 library;
 
-import 'package:pub/src/validator.dart';
-import 'package:pub/src/validator/relative_version_numbering.dart';
+import 'package:dart_pub/src/validator.dart';
+import 'package:dart_pub/src/validator/relative_version_numbering.dart';
 import 'package:test/test.dart';
 
 import '../descriptor.dart' as d;

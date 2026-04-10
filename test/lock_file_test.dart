@@ -5,10 +5,10 @@
 @TestOn('vm')
 library;
 
-import 'package:pub/src/lock_file.dart';
-import 'package:pub/src/package_name.dart';
-import 'package:pub/src/source/hosted.dart';
-import 'package:pub/src/system_cache.dart';
+import 'package:dart_pub/src/lock_file.dart';
+import 'package:dart_pub/src/package_name.dart';
+import 'package:dart_pub/src/source/hosted.dart';
+import 'package:dart_pub/src/system_cache.dart';
 import 'package:pub_semver/pub_semver.dart';
 import 'package:source_span/source_span.dart';
 import 'package:test/test.dart' hide Description;

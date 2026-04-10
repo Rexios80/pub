@@ -6,7 +6,7 @@
 library;
 
 import 'package:args/command_runner.dart';
-import 'package:pub/src/command_runner.dart' show PubCommandRunner;
+import 'package:dart_pub/src/command_runner.dart' show PubCommandRunner;
 import 'package:test/test.dart';
 
 import 'golden_file.dart';

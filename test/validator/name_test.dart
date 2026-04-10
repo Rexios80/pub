@@ -5,10 +5,10 @@
 @TestOn('vm')
 library;
 
-import 'package:pub/src/io.dart';
-import 'package:pub/src/path.dart';
-import 'package:pub/src/validator.dart';
-import 'package:pub/src/validator/name.dart';
+import 'package:dart_pub/src/io.dart';
+import 'package:dart_pub/src/path.dart';
+import 'package:dart_pub/src/validator.dart';
+import 'package:dart_pub/src/validator/name.dart';
 import 'package:test/test.dart';
 
 import '../descriptor.dart' as d;

@@ -7,10 +7,10 @@ library;
 
 import 'dart:io';
 
-import 'package:pub/src/entrypoint.dart';
-import 'package:pub/src/exceptions.dart';
-import 'package:pub/src/path.dart';
-import 'package:pub/src/system_cache.dart';
+import 'package:dart_pub/src/entrypoint.dart';
+import 'package:dart_pub/src/exceptions.dart';
+import 'package:dart_pub/src/path.dart';
+import 'package:dart_pub/src/system_cache.dart';
 import 'package:test/test.dart';
 
 import 'descriptor.dart' as d;

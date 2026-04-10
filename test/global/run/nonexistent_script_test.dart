@@ -5,8 +5,8 @@
 @TestOn('vm')
 library;
 
-import 'package:pub/src/exit_codes.dart' as exit_codes;
-import 'package:pub/src/path.dart';
+import 'package:dart_pub/src/exit_codes.dart' as exit_codes;
+import 'package:dart_pub/src/path.dart';
 import 'package:test/test.dart';
 
 import '../../test_pub.dart';

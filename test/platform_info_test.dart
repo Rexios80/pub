@@ -6,8 +6,8 @@ import 'package:analyzer/dart/analysis/analysis_context_collection.dart';
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
+import 'package:dart_pub/src/platform_info.dart';
 import 'package:path/path.dart' as p;
-import 'package:pub/src/platform_info.dart';
 import 'package:source_span/source_span.dart';
 import 'package:test/test.dart';
 

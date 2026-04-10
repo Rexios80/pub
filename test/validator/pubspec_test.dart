@@ -5,7 +5,7 @@
 @TestOn('vm')
 library;
 
-import 'package:pub/src/validator/pubspec.dart';
+import 'package:dart_pub/src/validator/pubspec.dart';
 import 'package:test/test.dart';
 
 import '../descriptor.dart' as d;

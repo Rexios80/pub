@@ -8,8 +8,8 @@ library;
 import 'dart:async';
 import 'dart:convert' show utf8;
 
+import 'package:dart_pub/pub.dart';
 import 'package:file/memory.dart';
-import 'package:pub/pub.dart';
 import 'package:test/test.dart';
 
 import 'bytesink.dart';

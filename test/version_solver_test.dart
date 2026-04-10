@@ -8,12 +8,12 @@ library;
 import 'dart:async';
 import 'dart:io';
 
-import 'package:pub/src/lock_file.dart';
-import 'package:pub/src/path.dart';
-import 'package:pub/src/pubspec.dart';
-import 'package:pub/src/source/hosted.dart';
-import 'package:pub/src/source/root.dart';
-import 'package:pub/src/system_cache.dart';
+import 'package:dart_pub/src/lock_file.dart';
+import 'package:dart_pub/src/path.dart';
+import 'package:dart_pub/src/pubspec.dart';
+import 'package:dart_pub/src/source/hosted.dart';
+import 'package:dart_pub/src/source/root.dart';
+import 'package:dart_pub/src/system_cache.dart';
 import 'package:test/test.dart';
 
 import 'descriptor.dart' as d;

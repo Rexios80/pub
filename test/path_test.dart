@@ -11,8 +11,8 @@ import 'dart:io';
 import 'package:analyzer/dart/analysis/features.dart';
 import 'package:analyzer/dart/analysis/utilities.dart';
 import 'package:analyzer/dart/ast/ast.dart';
+import 'package:dart_pub/src/path.dart';
 import 'package:path/path.dart' as path;
-import 'package:pub/src/path.dart';
 import 'package:test/test.dart';
 
 void main() {

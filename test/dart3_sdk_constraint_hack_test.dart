@@ -5,7 +5,7 @@
 @TestOn('vm')
 library;
 
-import 'package:pub/src/exit_codes.dart';
+import 'package:dart_pub/src/exit_codes.dart';
 import 'package:test/test.dart';
 
 import 'descriptor.dart' as d;

@@ -9,10 +9,10 @@ import 'dart:async';
 import 'dart:convert' show utf8;
 
 import 'package:args/command_runner.dart';
+import 'package:dart_pub/pub.dart';
 import 'package:file/file.dart' as f;
 import 'package:file/memory.dart';
 import 'package:http/http.dart' as http;
-import 'package:pub/pub.dart';
 import 'package:test/test.dart';
 
 import 'bytesink.dart';

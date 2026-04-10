@@ -5,9 +5,9 @@
 @TestOn('vm')
 library;
 
-import 'package:pub/src/language_version.dart';
+import 'package:dart_pub/src/language_version.dart';
 
-import 'package:pub/src/source/git.dart';
+import 'package:dart_pub/src/source/git.dart';
 
 import 'package:test/test.dart';
 

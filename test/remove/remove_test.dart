@@ -7,7 +7,7 @@ library;
 
 import 'dart:io' show File;
 
-import 'package:pub/src/path.dart';
+import 'package:dart_pub/src/path.dart';
 import 'package:test/test.dart';
 
 import '../descriptor.dart' as d;

@@ -8,8 +8,8 @@ library;
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:pub/src/exit_codes.dart';
-import 'package:pub/src/path.dart';
+import 'package:dart_pub/src/exit_codes.dart';
+import 'package:dart_pub/src/path.dart';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:test/test.dart';
 import 'package:yaml/yaml.dart';

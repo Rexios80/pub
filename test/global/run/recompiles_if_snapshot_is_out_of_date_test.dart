@@ -7,10 +7,10 @@ library;
 
 import 'dart:io';
 
-import 'package:pub/src/exit_codes.dart';
-import 'package:pub/src/io.dart';
-import 'package:pub/src/path.dart';
-import 'package:pub/src/sdk/sdk_package_config.dart';
+import 'package:dart_pub/src/exit_codes.dart';
+import 'package:dart_pub/src/io.dart';
+import 'package:dart_pub/src/path.dart';
+import 'package:dart_pub/src/sdk/sdk_package_config.dart';
 import 'package:test/test.dart';
 
 import '../../descriptor.dart' as d;

@@ -5,9 +5,9 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:pub/src/io.dart';
-import 'package:pub/src/log.dart' as log;
-import 'package:pub/src/path.dart';
+import 'package:dart_pub/src/io.dart';
+import 'package:dart_pub/src/log.dart' as log;
+import 'package:dart_pub/src/path.dart';
 import 'package:test_descriptor/test_descriptor.dart';
 
 /// Describes a tar file and its contents.
