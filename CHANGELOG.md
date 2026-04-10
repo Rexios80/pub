@@ -1,3 +1,8 @@
+## 0.0.8
+
+- Upgrades to commit `764c4b3edc69f29596ff8167664447586850ab60`
+- Upgrades to analyzer `12.0.0`
+
 ## 0.0.7
 
 - Upgrades to commit `d3d0824ab752bfd7234d9fcb2db9bf6abad9fdfa`
