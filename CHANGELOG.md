@@ -1,7 +1,8 @@
 ## 0.0.9
 
 - Upgrades to commit `bdc44e6c2e3c04e5056cc304ed43c212b66c70d2`
-- Upgrades to analyzer `13.0.0`
+- Upgrades to analyzer `14.0.0`
+- Upgrades to cli_util `0.5.0`
 
 ## 0.0.8
 
