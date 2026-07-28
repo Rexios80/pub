@@ -1,6 +1,6 @@
 ## 0.0.9
 
-- Upgrades to commit `720988bb173f7852e5f79a3a2f4f248f1fa6a6dd`
+- Upgrades to commit `bdc44e6c2e3c04e5056cc304ed43c212b66c70d2`
 - Upgrades to analyzer `13.0.0`
 
 ## 0.0.8
