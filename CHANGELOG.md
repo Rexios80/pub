@@ -1,3 +1,7 @@
+## 0.0.10
+
+- Upgrades to cli_util `0.6.0`
+
 ## 0.0.9
 
 - Upgrades to commit `bdc44e6c2e3c04e5056cc304ed43c212b66c70d2`
