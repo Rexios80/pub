@@ -3,12 +3,13 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import '../package_name.dart';
+import '../utils.dart';
 import 'incompatibility_cause.dart';
 import 'term.dart';
 
 /// A set of mutually-incompatible terms.
 ///
-/// See https://github.com/dart-lang/pub/tree/master/doc/solver.md#incompatibility.
+/// See https://github.com/dart-lang/pub/tree/main/doc/solver.md#incompatibility.
 class Incompatibility {
   /// The mutually-incompatible terms.
   final List<Term> terms;
@@ -131,7 +132,7 @@ class Incompatibility {
       assert(terms.length == 1);
       assert(terms.first.isPositive);
       return 'no versions of ${_terseRef(terms.first, details)} '
-          'match ${terms.first.constraint}';
+          'match ${terms.first.constraint.asCompatibleWithIfPossible()}';
     } else if (cause is PackageNotFoundIncompatibilityCause) {
       assert(terms.length == 1);
       assert(terms.first.isPositive);

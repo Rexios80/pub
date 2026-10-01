@@ -9,7 +9,11 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:dart_pub/src/exit_codes.dart';
+import 'package:dart_pub/src/io.dart';
+import 'package:dart_pub/src/package.dart';
 import 'package:dart_pub/src/path.dart';
+import 'package:dart_pub/src/pubspec.dart';
+import 'package:file/memory.dart';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:test/test.dart';
 import 'package:yaml/yaml.dart';
@@ -167,6 +171,67 @@ void main() {
       packageConfigEntry(name: 'a', path: './pkgs/a'),
       packageConfigEntry(name: 'example', path: './pkgs/a/example'),
     ], generatorVersion: '3.5.0').validate();
+  });
+
+  test('reports dependency conflicts with nested workspace members', () async {
+    final server = await servePackages();
+    server.serve('workspace_dep', '1.0.0');
+    server.serve('shared_dep', '1.0.0');
+    server.serve('shared_dep', '2.0.0');
+    await dir(appPath, [
+      libPubspec(
+        'myapp',
+        '1.2.3',
+        devDeps: {'shared_dep': '^2.0.0'},
+        extras: {
+          'workspace': ['pkgs/app', 'pkgs/inner'],
+        },
+        sdk: '^3.5.0',
+      ),
+      dir('pkgs', [
+        dir('app', [
+          libPubspec(
+            'app',
+            '1.0.0',
+            deps: {'workspace_dep': 'any'},
+            resolutionWorkspace: true,
+          ),
+        ]),
+        dir('inner', [
+          libPubspec(
+            'inner',
+            '1.0.0',
+            extras: {
+              'workspace': ['workspace_dep'],
+            },
+            resolutionWorkspace: true,
+          ),
+          dir('workspace_dep', [
+            libPubspec(
+              'workspace_dep',
+              '1.0.0',
+              devDeps: {'shared_dep': '^1.0.0'},
+              resolutionWorkspace: true,
+            ),
+          ]),
+        ]),
+      ]),
+    ]).create();
+
+    await pubGet(
+      environment: {'_PUB_TEST_SDK_VERSION': '3.5.0'},
+      error: allOf(
+        contains('workspace_dep'),
+        contains('shared_dep ^1.0.0'),
+        contains('shared_dep ^2.0.0'),
+        contains('version solving failed.'),
+        isNot(contains('Null check operator used on a null value')),
+        isNot(contains('!term.isPositive')),
+        isNot(
+          contains('Duplicate name workspace_dep in generated package config'),
+        ),
+      ),
+    );
   });
 
   test('checks constraints between workspace members', () async {
@@ -1959,6 +2024,172 @@ Consider changing the language version of .${s}pubspec.yaml to 3.11.'''),
         packageConfigEntry(name: 'b', path: 'pkgs/b'),
       ], generatorVersion: '3.11.0'),
     ]).validate();
+  });
+
+  test(
+    'literal workspace entries are resolved with newer language versions',
+    () async {
+      await dir(appPath, [
+        libPubspec(
+          'myapp',
+          '1.2.3',
+          extras: {
+            'workspace': ['pkgs/foo-bar', 'pkgs/baz_qux', 'other_pkgs/*'],
+          },
+          sdk: '^3.11.0',
+        ),
+        dir('pkgs', [
+          dir('foo-bar', [
+            libPubspec('foo_bar', '1.1.1', resolutionWorkspace: true),
+          ]),
+          dir('baz_qux', [
+            libPubspec('baz_qux', '1.1.1', resolutionWorkspace: true),
+          ]),
+        ]),
+        dir('other_pkgs', [
+          dir('a', [libPubspec('a', '1.1.1', resolutionWorkspace: true)]),
+        ]),
+      ]).create();
+      await pubGet(environment: {'_PUB_TEST_SDK_VERSION': '3.11.0'});
+      await dir(appPath, [
+        packageConfigFile([
+          packageConfigEntry(name: 'myapp', path: '.'),
+          packageConfigEntry(name: 'foo_bar', path: 'pkgs/foo-bar'),
+          packageConfigEntry(name: 'baz_qux', path: 'pkgs/baz_qux'),
+          packageConfigEntry(name: 'a', path: 'other_pkgs/a'),
+        ], generatorVersion: '3.11.0'),
+      ]).validate();
+    },
+  );
+
+  test('literal workspace entries with platform separators work with newer '
+      'language versions', () async {
+    await dir(appPath, [
+      libPubspec(
+        'myapp',
+        '1.2.3',
+        extras: {
+          'workspace': [p.join('pkgs', 'foo')],
+        },
+        sdk: '^3.11.0',
+      ),
+      dir('pkgs', [
+        dir('foo', [libPubspec('foo', '1.1.1', resolutionWorkspace: true)]),
+      ]),
+    ]).create();
+    await pubGet(environment: {'_PUB_TEST_SDK_VERSION': '3.11.0'});
+    await dir(appPath, [
+      packageConfigFile([
+        packageConfigEntry(name: 'myapp', path: '.'),
+        packageConfigEntry(name: 'foo', path: 'pkgs/foo'),
+      ], generatorVersion: '3.11.0'),
+    ]).validate();
+  });
+
+  test('literal workspace entries with special characters work with newer '
+      'language versions', () async {
+    await dir(appPath, [
+      libPubspec(
+        'myapp',
+        '1.2.3',
+        extras: {
+          'workspace': [
+            'pkgs/my space',
+            'pkgs/@scope',
+            'pkgs/pkg.v1',
+            'pkgs/pkg+plus',
+            'pkgs/pkg(paren)',
+          ],
+        },
+        sdk: '^3.11.0',
+      ),
+      dir('pkgs', [
+        dir('my space', [
+          libPubspec('my_space', '1.1.1', resolutionWorkspace: true),
+        ]),
+        dir('@scope', [
+          libPubspec('scope_pkg', '1.1.1', resolutionWorkspace: true),
+        ]),
+        dir('pkg.v1', [
+          libPubspec('pkg_v1', '1.1.1', resolutionWorkspace: true),
+        ]),
+        dir('pkg+plus', [
+          libPubspec('pkg_plus', '1.1.1', resolutionWorkspace: true),
+        ]),
+        dir('pkg(paren)', [
+          libPubspec('pkg_paren', '1.1.1', resolutionWorkspace: true),
+        ]),
+      ]),
+    ]).create();
+    await pubGet(environment: {'_PUB_TEST_SDK_VERSION': '3.11.0'});
+    await dir(appPath, [
+      packageConfigFile([
+        packageConfigEntry(name: 'myapp', path: '.'),
+        packageConfigEntry(name: 'my_space', path: 'pkgs/my space'),
+        packageConfigEntry(name: 'scope_pkg', path: 'pkgs/@scope'),
+        packageConfigEntry(name: 'pkg_v1', path: 'pkgs/pkg.v1'),
+        packageConfigEntry(name: 'pkg_plus', path: 'pkgs/pkg+plus'),
+        packageConfigEntry(name: 'pkg_paren', path: 'pkgs/pkg(paren)'),
+      ], generatorVersion: '3.11.0'),
+    ]).validate();
+  });
+
+  test('non-existent literal workspace entry gives good error with newer '
+      'language versions', () async {
+    await dir(appPath, [
+      libPubspec(
+        'myapp',
+        '1.2.3',
+        extras: {
+          'workspace': ['pkgs/nonexistent'],
+        },
+        sdk: '^3.11.0',
+      ),
+    ]).create();
+    await pubGet(
+      environment: {'_PUB_TEST_SDK_VERSION': '3.11.0'},
+      error: contains(
+        'No workspace packages matching `pkgs/nonexistent`.\n'
+        'That was included in the workspace of `.${s}pubspec.yaml`.',
+      ),
+      exitCode: 1,
+    );
+  });
+
+  test('globs are resolved when using overridden filesystem', () async {
+    final fs = MemoryFileSystem(
+      style:
+          Platform.isWindows ? FileSystemStyle.windows : FileSystemStyle.posix,
+    );
+    final myappPath = fs.path.absolute('myapp');
+    fs.directory(myappPath).createSync(recursive: true);
+    fs.file(fs.path.join(myappPath, 'pubspec.yaml')).writeAsStringSync('''
+name: myapp
+version: 1.2.3
+workspace:
+  - pkgs/a
+environment:
+  sdk: '^3.11.0'
+''');
+    final pkgAPath = fs.path.join(myappPath, 'pkgs', 'a');
+    fs.directory(pkgAPath).createSync(recursive: true);
+    fs.file(fs.path.join(pkgAPath, 'pubspec.yaml')).writeAsStringSync('''
+name: a
+version: 1.1.1
+resolution: workspace
+environment:
+  sdk: '^3.11.0'
+''');
+
+    await withOverrides(() async {
+      final package = Package.load(
+        myappPath,
+        loadPubspec: Pubspec.loadRootWithSources(
+          (name) => throw UnimplementedError(),
+        ),
+      );
+      expect(package.transitiveWorkspace.map((pkg) => pkg.name), contains('a'));
+    }, fileSystem: fs);
   });
 }
 

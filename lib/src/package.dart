@@ -5,7 +5,6 @@
 import 'dart:io';
 
 import 'package:glob/glob.dart';
-import 'package:glob/list_local_fs.dart';
 import 'package:pub_semver/pub_semver.dart';
 
 import 'exceptions.dart';
@@ -181,14 +180,22 @@ class Package {
         pubspec.workspace.expand((workspacePath) {
           final packages = <Package>[];
           var globHint = '';
-          if (pubspec.languageVersion.supportsWorkspaceGlobs) {
+          if (pubspec.languageVersion.supportsWorkspaceGlobs &&
+              _hasGlobWildcards(workspacePath)) {
             final Glob glob;
             try {
               glob = Glob(workspacePath);
             } on FormatException catch (e) {
               fail('Failed to parse glob `$workspacePath`. $e');
             }
-            for (final globResult in glob.listSync(root: dir)) {
+            final globResults =
+                glob
+                    .listFileSystemSync(
+                      currentFileSystem,
+                      root: p.absolute(dir),
+                    )
+                    .toList();
+            for (final globResult in globResults) {
               final pubspecPath = p.join(globResult.path, 'pubspec.yaml');
               if (!fileExists(pubspecPath)) continue;
               packages.add(
@@ -200,9 +207,14 @@ class Package {
               );
             }
           } else {
-            final pubspecPath = p.join(dir, workspacePath, 'pubspec.yaml');
+            final pubspecPath = p.join(
+              dir,
+              _useBackSlashesOnWindows(workspacePath),
+              'pubspec.yaml',
+            );
             if (!fileExists(pubspecPath)) {
-              if (_looksLikeGlob(workspacePath)) {
+              if (!pubspec.languageVersion.supportsWorkspaceGlobs &&
+                  _hasGlobWildcards(workspacePath)) {
                 globHint = '''
 \n\nGlob syntax is only supported from language version ${LanguageVersion.firstVersionWithWorkspaceGlobs}.
 Consider changing the language version of ${p.join(dir, 'pubspec.yaml')} to ${LanguageVersion.firstVersionWithWorkspaceGlobs}.
@@ -301,14 +313,11 @@ See $workspacesDocUrl for more information.
   }) {
     final packageDir = dir;
     final root = git.repoRoot(packageDir) ?? packageDir;
-    beneath =
-        p
-            .toUri(
-              p.normalize(
-                p.relative(p.join(packageDir, beneath ?? '.'), from: root),
-              ),
-            )
-            .path;
+    beneath = p.posix.joinAll(
+      p.split(
+        p.normalize(p.relative(p.join(packageDir, beneath ?? '.'), from: root)),
+      ),
+    );
     if (beneath == './') beneath = '.';
     String resolve(String path) {
       if (platform.isWindows) {
@@ -583,7 +592,16 @@ See https://dart.dev/go/workspaces-stray-files for details.
   }
 }
 
-bool _looksLikeGlob(String s) => Glob.quote(s) != s;
+/// Returns whether [s] contains any glob wildcard syntax characters.
+///
+/// We intentionally do not account for backslash-escaped wildcards (like `\*`).
+/// Paths without any of these characters are guaranteed to be plain relative
+/// paths that can be checked directly on the filesystem without unescaping or
+/// glob parsing. Paths containing these characters (even if escaped) are
+/// delegated to `package:glob` to handle unescaping properly and to avoid
+/// conflicting with Windows `\` path separators.
+bool _hasGlobWildcards(String s) =>
+    s.contains('*') || s.contains('?') || s.contains('[') || s.contains('{');
 String _useBackSlashesOnWindows(String path) {
   if (platform.isWindows) {
     return p.joinAll(p.split(path));
